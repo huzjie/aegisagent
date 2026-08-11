@@ -1,0 +1,156 @@
+id: finance-payment
+name: Finance & Payment Protection
+version: "2026.08.11"
+description: Strict controls for financial transactions and payment instrument tooling.
+defaults:
+  effect: require_approval
+rules:
+  - id: finance-payment-deny-default
+    description: Any payment-category call requires explicit human approval.
+    priority: 980
+    effect: require_approval
+    references: [OWASP-LLM04, OWASP-LLM06]
+    match:
+      categories: [payment]
+    obligations:
+      approval_roles: [finance, admin]
+      require_step_up: true
+  - id: finance-large-transfer-deny
+    description: High-value transfers are denied and escalated to dual control.
+    priority: 995
+    effect: deny
+    references: [OWASP-LLM04]
+    when:
+      all:
+        - { field: arguments.amount, op: gt, value: 10000 }
+        - { field: categories, op: contains, value: payment }
+  - id: finance-untrusted-agent-deny
+    description: Untrusted agents are forbidden from any payment operation.
+    priority: 990
+    effect: deny
+    references: [OWASP-LLM04, OWASP-LLM06]
+    match:
+      categories: [payment]
+    when:
+      all:
+        - { field: agent.trust_tier, op: eq, value: untrusted }
+  - id: finance-offbook-account-deny
+    description: Payments to accounts not on the approved vendor list are denied.
+    priority: 970
+    effect: deny
+    references: [OWASP-LLM04]
+    when:
+      all:
+        - { field: arguments.recipient, op: not_in, value: [treasury, payroll, approved-vendor] }
+        - { field: categories, op: contains, value: payment }
+  - id: finance-currency-conversion-approval
+    description: Foreign-currency conversions require approval.
+    priority: 900
+    effect: require_approval
+    references: [OWASP-LLM04]
+    when:
+      all:
+        - { field: arguments.action, op: eq, value: convert_currency }
+    obligations:
+      approval_roles: [finance]
+  - id: finance-refund-approval
+    description: Refunds above the threshold require a finance approver.
+    priority: 920
+    effect: require_approval
+    references: [OWASP-LLM04]
+    when:
+      all:
+        - { field: arguments.action, op: eq, value: refund }
+        - { field: arguments.amount, op: gte, value: 500 }
+    obligations:
+      approval_roles: [finance]
+  - id: finance-card-data-redact
+    description: Card and bank details in arguments are redacted before execution.
+    priority: 940
+    effect: redact
+    references: [OWASP-LLM07, OWASP-LLM04]
+    match:
+      categories: [payment]
+    obligations:
+      redact: [arguments.card_number, arguments.account, arguments.cvv, arguments.iban]
+  - id: finance-sandbox-test
+    description: Payments in a non-production environment run in a sandbox.
+    priority: 820
+    effect: sandbox
+    references: [OWASP-LLM04]
+    match:
+      categories: [payment]
+    when:
+      all:
+        - { field: environment, op: ne, value: production }
+  - id: finance-velocity-throttle
+    description: Repeated payment attempts are throttled to detect fraud.
+    priority: 860
+    effect: throttle
+    references: [OWASP-LLM04]
+    match:
+      categories: [payment]
+    obligations:
+      throttle: { per_minute: 3, burst: 1 }
+  - id: finance-incident-on-deny
+    description: A denied finance call always opens a high-severity incident.
+    priority: 700
+    effect: observe
+    references: [OWASP-LLM04]
+    when:
+      all:
+        - { field: extra.finance_blocked, op: eq, value: true }
+    obligations:
+      incident: true
+      severity: critical
+  - id: finance-money-movement-tool-deny
+    description: Money-movement tools are pinned by name and denied unless the call is provenance-verified.
+    priority: 998
+    effect: deny
+    references: [OWASP-LLM04, CVE-2026-18830, CVE-2026-18236]
+    match:
+      tools:
+        - "payments::transfer"
+        - "payments::payout"
+        - "stripe::create_charge"
+        - "stripe::create_payout"
+        - "bank::wire"
+        - "bank::ach_debit"
+        - "crypto::send_transaction"
+        - "paypal::payout"
+    when:
+      any:
+        - { field: provenance.status, op: ne, value: verified }
+        - { field: call.source, op: ne, value: model }
+    obligations:
+      incident: true
+      severity: critical
+  - id: finance-money-movement-tool-approval
+    description: Even a fully verified money-movement call needs dual finance approval.
+    priority: 975
+    effect: require_approval
+    references: [OWASP-LLM04]
+    match:
+      tools:
+        - "payments::transfer"
+        - "payments::payout"
+        - "stripe::create_charge"
+        - "stripe::create_payout"
+        - "bank::wire"
+        - "bank::ach_debit"
+        - "crypto::send_transaction"
+        - "paypal::payout"
+    obligations:
+      approval_roles: [finance, admin]
+      require_step_up: true
+      notify: [finance-oncall, security-oncall]
+      annotate: { min_approvals: 2, dual_control: true }
+  - id: finance-verified-small-allow
+    description: Small, verified, in-policy payments from a trusted agent are allowed.
+    priority: 150
+    effect: allow
+    when:
+      all:
+        - { field: arguments.amount, op: lte, value: 50 }
+        - { field: agent.trust_tier, op: in, value: [trusted, privileged] }
+        - { field: provenance.status, op: eq, value: verified }

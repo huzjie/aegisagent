@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+*.whl
+pip-log.txt
+pip-delete-this-directory.txt
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Distribution / packaging
+sdist/
+wheels/
+manifest/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+
+# mypy
+.mypy_cache/
+
+# ruff
+.ruff_cache/
+
+# Docker
+*.log
+
+# Local config
+.aegis/
+*.sqlite3
+
+# Keys and secrets
+*.pem
+*.key
+*.crt
+push_api.py
+.push_cache.json

@@ -1,0 +1,112 @@
+id: tool-poisoning
+version: "2026.08.1"
+description: "MCP tool-poisoning signatures: hidden directives, rug-pull markers and shadowing language inside declared tool metadata."
+signatures:
+  - id: tp-001
+    pattern: '(?i)<\s*(?:IMPORTANT|SYSTEM|SECRET|HIDDEN|INSTRUCTIONS?)\s*>'
+    severity: critical
+    confidence: 0.9
+    description: Pseudo-tag block used to smuggle directives into a tool description.
+    tags: [en, hidden_block, mcp]
+  - id: tp-002
+    pattern: '(?i)\b(?:before|prior\s+to)\s+(?:using|calling|invoking)\s+this\s+tool[^.?!]{0,80}(?:read|send|fetch|call|execute|include)'
+    severity: critical
+    confidence: 0.9
+    description: Pre-invocation side effect demanded by the tool description.
+    tags: [en, side_effect, mcp]
+  - id: tp-003
+    pattern: '(?i)\bwhen\s+(?:you\s+are\s+)?(?:called|invoked|used)[^.?!]{0,80}\b(?:also|first|instead|always)\b'
+    severity: high
+    confidence: 0.8
+    description: Invoke-time trigger instruction inside declared metadata.
+    tags: [en, side_effect, mcp]
+  - id: tp-004
+    pattern: '(?i)\b(?:always|you\s+must)\s+(?:pass|include|append|attach)\b[^.?!]{0,80}(?:\.env|ssh|credential|token|api[_-]?key|password|conversation|system\s+prompt)'
+    severity: critical
+    confidence: 0.92
+    description: Tool description demands secrets be passed as parameters.
+    tags: [en, credential_harvest, mcp]
+  - id: tp-005
+    pattern: '(?i)\bdo\s+not\s+(?:mention|display|show|reveal|describe)\s+(?:this|these|the\s+following)\s+(?:instructions?|steps?|note|section)'
+    severity: critical
+    confidence: 0.92
+    description: Description tells the model to hide part of itself from the user.
+    tags: [en, covert, mcp]
+  - id: tp-006
+    pattern: '(?:请勿|不要)(?:向|告诉)?(?:用户)?(?:展示|提及|说明|透露)(?:这些|此)?(?:说明|指令|内容)'
+    severity: critical
+    confidence: 0.9
+    description: Chinese covert-instruction marker in tool metadata.
+    tags: [zh, covert, mcp]
+  - id: tp-007
+    pattern: '(?i)\bthis\s+tool\s+(?:supersedes|replaces|overrides)\s+(?:all\s+)?(?:other|previous|the)\s+tools?'
+    severity: critical
+    confidence: 0.9
+    description: Tool shadowing - claims priority over other registered tools.
+    tags: [en, shadowing, mcp]
+  - id: tp-008
+    pattern: '(?i)\b(?:prefer|use)\s+this\s+tool\s+(?:instead\s+of|over|rather\s+than)\s+[a-z_][a-z0-9_]{2,40}'
+    severity: high
+    confidence: 0.8
+    description: Description redirects traffic away from the legitimate tool.
+    tags: [en, shadowing, mcp]
+  - id: tp-009
+    pattern: '(?i)\b(?:ignore|disregard|override)\b[^.?!]{0,60}\b(?:the\s+)?(?:user|system|policy|approval|guardrail)'
+    severity: critical
+    confidence: 0.88
+    description: Override language inside declared tool metadata.
+    tags: [en, override, mcp]
+  - id: tp-010
+    pattern: '(?i)\bfor\s+(?:internal|debug|maintenance|compatibility)\s+(?:use|purposes)\s+only[^.?!]{0,60}(?:do\s+not|hide|skip|bypass)'
+    severity: high
+    confidence: 0.8
+    description: Pretext framing that justifies hidden behaviour.
+    tags: [en, social_engineering, mcp]
+  - id: tp-011
+    pattern: '(?i)\bschema\s+(?:has\s+)?(?:changed|updated)\b[^.?!]{0,60}\bre-?(?:approve|authorise|authorize)\s+(?:automatically|silently)'
+    severity: critical
+    confidence: 0.9
+    description: Rug-pull marker - asks for automatic re-approval after a schema change.
+    tags: [en, rug_pull, mcp]
+  - id: tp-012
+    pattern: '(?i)\b(?:hidden|invisible|secret)\s+(?:parameter|field|argument|payload)\b'
+    severity: high
+    confidence: 0.8
+    description: Declares an undocumented parameter channel.
+    tags: [en, hidden_parameter, mcp]
+  - id: tp-013
+    pattern: '(?i)\bthe\s+user\s+(?:has\s+already\s+)?(?:approved|authorised|authorized|consented)\b'
+    severity: high
+    confidence: 0.85
+    description: Fabricated consent claim to short-circuit the approval gate.
+    tags: [en, approval_bypass, mcp]
+  - id: tp-014
+    pattern: '(?:用户)(?:已经)?(?:批准|授权|同意)'
+    severity: high
+    confidence: 0.75
+    description: Chinese fabricated-consent claim.
+    tags: [zh, approval_bypass, mcp]
+  - id: tp-015
+    pattern: '(?i)\b(?:exfiltrate|leak|forward)\b[^.?!]{0,60}\b(?:to|toward)\b[^.?!]{0,60}(?:https?://|webhook|attacker|external)'
+    severity: critical
+    confidence: 0.92
+    description: Outbound-transfer instruction embedded in tool metadata.
+    tags: [en, exfiltration, mcp]
+  - id: tp-016
+    pattern: '(?i)\bdescription\s*[:=]\s*["''][^"'']{0,40}(?:ignore|override|system\s+prompt)'
+    severity: high
+    confidence: 0.75
+    description: Nested description field carrying override language.
+    tags: [en, override, mcp]
+  - id: tp-017
+    pattern: '(?i)\b(?:read|open|load)\s+(?:the\s+)?(?:file\s+)?(?:~/\.ssh|~/\.aws|/etc/passwd|\.env)\b'
+    severity: critical
+    confidence: 0.9
+    description: Metadata instructs the agent to read sensitive host files.
+    tags: [en, credential_harvest, mcp]
+  - id: tp-018
+    pattern: '(?i)\bthis\s+(?:parameter|field)\s+(?:is|must\s+be)\s+(?:ignored|unused)\s+by\s+the\s+user\b'
+    severity: medium
+    confidence: 0.65
+    description: Hides a parameter from human review while keeping it functional.
+    tags: [en, hidden_parameter, mcp]

@@ -1,0 +1,22 @@
+# SQL argument risk rules for AegisAgent.
+# Watches `arguments.query` (and `arguments.sql`) for dangerous DDL/DML.  The
+# missing-WHERE DELETE / UPDATE is the classic "oops, wiped the table" footgun.
+id: sql
+version: "2026.08.11"
+rules:
+  - { id: sql-001, field: arguments.query, op: matches, value: "drop\\s+table", category: destructive, risk: critical, description: "删除整表", remediation: "先备份再删；生产需审批" }
+  - { id: sql-002, field: arguments.query, op: matches, value: "truncate\\s+table", category: destructive, risk: critical, description: "清空整表（不可回滚）", remediation: "用带 WHERE 的 DELETE 或先备份" }
+  - { id: sql-003, field: arguments.query, op: matches, value: "drop\\s+database", category: destructive, risk: critical, description: "删除整个数据库", remediation: "禁止运行时删库；走变更流程" }
+  - { id: sql-004, field: arguments.query, op: matches, value: "delete\\s+from\\s+\\w+\\s*(;|$)", category: destructive, risk: critical, description: "无 WHERE 的全表删除", remediation: "强制要求 WHERE 条件或 LIMIT/事务" }
+  - { id: sql-005, field: arguments.query, op: matches, value: "update\\s+\\w+\\s+set\\s+[^;]*?(;|$)", category: destructive, risk: critical, description: "无 WHERE 的全表更新", remediation: "强制要求 WHERE 条件" }
+  - { id: sql-006, field: arguments.query, op: matches, value: "truncate\\s+", category: destructive, risk: high, description: "truncate 操作", remediation: "确认影响范围" }
+  - { id: sql-007, field: arguments.query, op: matches, value: "alter\\s+table\\s+\\w+\\s+drop", category: destructive, risk: high, description: "删除表列", remediation: "结构变更走迁移流程并审批" }
+  - { id: sql-008, field: arguments.query, op: matches, value: "grant\\s+all|grant\\s+.*(super|root)", category: identity, risk: critical, description: "授予高权限", remediation: "最小权限授权，避免 ALL/SUPER" }
+  - { id: sql-009, field: arguments.query, op: matches, value: "create\\s+user|alter\\s+user|drop\\s+user", category: identity, risk: high, description: "账号管理操作", remediation: "账号变更需审批" }
+  - { id: sql-010, field: arguments.query, op: matches, value: "delete\\s+from\\s+\\w+\\s+where\\s+", category: write, risk: medium, description: "条件删除", remediation: "确认 WHERE 命中预期行数" }
+  - { id: sql-011, field: arguments.query, op: matches, value: "insert\\s+into\\s+.*select", category: write, risk: medium, description: "INSERT ... SELECT 批量写入", remediation: "确认源与目标一致" }
+  - { id: sql-012, field: arguments.query, op: matches, value: "copy\\s+\\w+\\s+from\\s+stdin|\\\\copy", category: data_export, risk: high, description: "服务端 COPY 导入", remediation: "确认数据源可信" }
+  - { id: sql-013, field: arguments.query, op: matches, value: "pg_dump|mysqldump", category: data_export, risk: medium, description: "数据库导出", remediation: "导出需加密并限制落盘位置" }
+  - { id: sql-014, field: arguments.query, op: matches, value: "(\\bunion\\b\\s+\\bselect\\b)|('\\s*or\\s*'1'='1|or\\s+1=1)", category: execute, risk: high, description: "疑似 SQL 注入特征", remediation: "使用参数化查询，禁止拼接" }
+  - { id: sql-015, field: arguments.query, op: matches, value: "lock\\s+table|begin\\s+transaction", category: write, risk: low, description: "显式锁/事务", remediation: "注意长事务与锁等待" }
+  - { id: sql-016, field: arguments.query, op: matches, value: "truncate\\s+table\\s+\\w+\\s*;\\s*$", category: destructive, risk: critical, description: "单行 truncate 语句", remediation: "需备份后执行" }

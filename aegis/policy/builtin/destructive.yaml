@@ -1,0 +1,152 @@
+id: destructive
+name: Destructive Operation Control
+version: "2026.08.11"
+description: Gate operations that irreversibly delete or modify state.
+defaults:
+  effect: require_approval
+rules:
+  - id: destructive-filesystem-delete
+    description: Recursive or force filesystem deletes require approval.
+    priority: 950
+    effect: require_approval
+    references: [OWASP-LLM04]
+    match:
+      categories: [destructive]
+    when:
+      all:
+        - { field: arguments.recursive, op: eq, value: true }
+    obligations:
+      approval_roles: [ops, admin]
+      require_step_up: true
+  - id: destructive-drop-database-deny
+    description: Dropping or truncating production databases is denied without break-glass.
+    priority: 980
+    effect: deny
+    references: [OWASP-LLM04]
+    when:
+      all:
+        - { field: arguments.action, op: in, value: [drop_table, drop_database, truncate_table] }
+        - { field: environment, op: eq, value: production }
+  - id: destructive-force-push-deny
+    description: Force-pushing to protected branches is denied.
+    priority: 960
+    effect: deny
+    references: [OWASP-LLM04]
+    when:
+      all:
+        - { field: arguments.force, op: eq, value: true }
+        - { field: arguments.protected, op: eq, value: true }
+  - id: destructive-instance-terminate-approval
+    description: Terminating compute instances requires approval from ops.
+    priority: 930
+    effect: require_approval
+    references: [OWASP-LLM04]
+    when:
+      all:
+        - { field: arguments.action, op: eq, value: terminate }
+    obligations:
+      approval_roles: [ops]
+  - id: destructive-bulk-delete-throttle
+    description: Bulk deletes are throttled to limit accidental data loss.
+    priority: 900
+    effect: throttle
+    references: [OWASP-LLM04]
+    when:
+      all:
+        - { field: arguments.count, op: gt, value: 1000 }
+    obligations:
+      throttle: { per_minute: 2, burst: 1 }
+  - id: destructive-format-deny
+    description: Formatting volumes or wiping disks is denied by default.
+    priority: 970
+    effect: deny
+    references: [OWASP-LLM04]
+    when:
+      all:
+        - { field: arguments.action, op: in, value: [format, wipe, shred] }
+  - id: destructive-untrusted-agent-deny
+    description: Untrusted agents may never run any destructive operation.
+    priority: 990
+    effect: deny
+    references: [OWASP-LLM04, OWASP-LLM06]
+    match:
+      categories: [destructive]
+    when:
+      all:
+        - { field: agent.trust_tier, op: eq, value: untrusted }
+  - id: destructive-reversible-allow
+    description: Reversible, single-item destructive ops are allowed with observation.
+    priority: 200
+    effect: observe
+    when:
+      all:
+        - { field: arguments.reversible, op: eq, value: true }
+        - { field: arguments.count, op: lte, value: 10 }
+  - id: destructive-sandbox-dryrun
+    description: Destructive calls are sandboxed unless explicitly approved.
+    priority: 700
+    effect: sandbox
+    references: [OWASP-LLM04]
+    match:
+      categories: [destructive]
+  - id: destructive-outside-window-approval
+    description: Destructive ops outside the maintenance window require senior approval.
+    priority: 880
+    effect: require_approval
+    references: [OWASP-LLM04]
+    match:
+      categories: [destructive]
+    obligations:
+      approval_roles: [ops, admin]
+  - id: destructive-incident-on-failure
+    description: A denied destructive call still opens an incident for forensics.
+    priority: 600
+    effect: observe
+    references: [OWASP-LLM04]
+    when:
+      all:
+        - { field: extra.destructive_attempted, op: eq, value: true }
+    obligations:
+      incident: true
+      severity: high
+  - id: destructive-shell-recursive-force-deny
+    description: A shell command carrying a recursive force delete is denied regardless of category tagging.
+    priority: 995
+    effect: deny
+    references: [OWASP-LLM04]
+    match:
+      tools: ["shell::exec", "shell::run", "bash::exec", "sh::run", "process::spawn"]
+    when:
+      any:
+        - { field: arguments.command, op: regex, value: "(?i)\\brm\\s+(-[a-z]*[rf][a-z]*\\s+)+" }
+        - { field: arguments.command, op: regex, value: "(?i)\\b(mkfs|shred|dd\\s+if=/dev/(zero|urandom))\\b" }
+        - { field: arguments.command, op: regex, value: "(?i):\\(\\)\\s*\\{\\s*:\\|:&\\s*\\}\\s*;\\s*:" }
+  - id: destructive-known-tool-stepup
+    description: Well-known irreversible tools always require a step-up approval from ops.
+    priority: 945
+    effect: require_approval
+    references: [OWASP-LLM04]
+    match:
+      tools:
+        - "fs::rm"
+        - "fs::rmtree"
+        - "fs::delete"
+        - "s3::delete_object"
+        - "s3::delete_bucket"
+        - "db::drop_table"
+        - "db::truncate"
+        - "k8s::delete"
+        - "aws::terminate_instances"
+        - "git::push_force"
+    obligations:
+      approval_roles: [ops, admin]
+      require_step_up: true
+  - id: destructive-infra-wildcard-sandbox
+    description: Every terraform or kubernetes mutation is sandboxed for a dry-run plan first.
+    priority: 730
+    effect: sandbox
+    references: [OWASP-LLM04]
+    match:
+      tools: ["terraform::*", "k8s::apply", "k8s::patch", "helm::*"]
+    obligations:
+      sandbox: { profile: dry-run, network: none }

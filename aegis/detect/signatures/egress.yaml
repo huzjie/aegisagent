@@ -1,0 +1,101 @@
+id: egress
+version: "2026.08.1"
+description: "SSRF and outbound-network signatures: cloud metadata, internal ranges, sensitive ports and scheme abuse."
+signatures:
+  - id: egr-001
+    pattern: '(?i)https?://169\.254\.169\.254(?:[:/]|$)'
+    severity: critical
+    confidence: 0.97
+    description: AWS/Azure/OpenStack instance metadata service - yields role credentials.
+    tags: [ssrf, metadata, aws]
+    references: ["https://owasp.org/www-community/attacks/Server_Side_Request_Forgery"]
+  - id: egr-002
+    pattern: '(?i)https?://metadata\.google\.internal(?:[:/]|$)'
+    severity: critical
+    confidence: 0.97
+    description: GCP metadata server.
+    tags: [ssrf, metadata, gcp]
+  - id: egr-003
+    pattern: '(?i)https?://100\.100\.100\.200(?:[:/]|$)'
+    severity: critical
+    confidence: 0.95
+    description: Alibaba Cloud metadata service.
+    tags: [ssrf, metadata, aliyun]
+  - id: egr-004
+    pattern: '(?i)/latest/meta-data/iam/security-credentials'
+    severity: critical
+    confidence: 0.97
+    description: IMDS path that returns temporary IAM credentials.
+    tags: [ssrf, metadata, credential]
+  - id: egr-005
+    pattern: '(?i)/metadata/identity/oauth2/token'
+    severity: critical
+    confidence: 0.95
+    description: Azure managed-identity token endpoint.
+    tags: [ssrf, metadata, azure]
+  - id: egr-006
+    pattern: '(?i)https?://(?:127\.\d{1,3}\.\d{1,3}\.\d{1,3}|localhost|0\.0\.0\.0|\[::1\])(?::\d{2,5})?'
+    severity: high
+    confidence: 0.8
+    description: Loopback target - SSRF pivot into locally-bound admin services.
+    tags: [ssrf, loopback]
+  - id: egr-007
+    pattern: '(?i)https?://(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})'
+    severity: high
+    confidence: 0.85
+    description: RFC1918 private address - lateral movement inside the VPC.
+    tags: [ssrf, private]
+  - id: egr-008
+    pattern: '(?i)https?://[a-z0-9.-]+\.(?:internal|local|intranet|corp|lan)(?::\d{2,5})?(?:[/?]|$)'
+    severity: high
+    confidence: 0.8
+    description: Internal-only TLD target.
+    tags: [ssrf, internal]
+  - id: egr-009
+    pattern: '(?i)https?://[^\s/]{1,255}:(?:6379|11211|9200|27017|5432|3306|1433|2379|8500)\b'
+    severity: high
+    confidence: 0.85
+    description: HTTP request aimed at a datastore/coordination port.
+    tags: [ssrf, dangerous_port, database]
+  - id: egr-010
+    pattern: '(?i)https?://[^\s/]{1,255}:(?:2375|2376|10250|10255)\b'
+    severity: critical
+    confidence: 0.9
+    description: Container runtime / kubelet API port - full node takeover if reachable.
+    tags: [ssrf, dangerous_port, container]
+  - id: egr-011
+    pattern: '(?i)\b(?:file|gopher|dict|ftp|tftp|ldap|jar|netdoc)://'
+    severity: critical
+    confidence: 0.88
+    description: Non-HTTP URL scheme commonly used to escalate SSRF into file read or protocol smuggling.
+    tags: [ssrf, scheme_abuse]
+  - id: egr-012
+    pattern: '(?i)\bhttps?://[^\s/@]{1,120}@[^\s/]{3,255}'
+    severity: high
+    confidence: 0.75
+    description: URL userinfo segment used to disguise the real host.
+    tags: [ssrf, url_confusion]
+  - id: egr-013
+    pattern: '(?i)https?://(?:0x[0-9a-f]{8}|\d{8,10})(?:[:/]|$)'
+    severity: high
+    confidence: 0.85
+    description: Hex or decimal encoded IP address - allowlist evasion.
+    tags: [ssrf, obfuscation]
+  - id: egr-014
+    pattern: '(?i)https?://[a-z0-9.-]*(?:127\.0\.0\.1|localhost)\.[a-z0-9.-]+'
+    severity: high
+    confidence: 0.85
+    description: DNS rebinding style hostname embedding a loopback literal.
+    tags: [ssrf, rebinding]
+  - id: egr-015
+    pattern: '(?i)https?://[^\s]{0,200}%(?:25)?(?:2e|2f|00)'
+    severity: medium
+    confidence: 0.65
+    description: Percent-encoded path traversal or null byte in a URL.
+    tags: [ssrf, obfuscation]
+  - id: egr-016
+    pattern: '(?i)\bhttps?://\[[0-9a-f:]{4,}\]'
+    severity: medium
+    confidence: 0.6
+    description: IPv6 literal destination - frequently missed by allowlists.
+    tags: [ssrf, ipv6]

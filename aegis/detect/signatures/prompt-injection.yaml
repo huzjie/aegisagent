@@ -1,0 +1,276 @@
+id: prompt-injection
+version: "2026.08.1"
+description: "Instruction override, role hijack, prompt leak, delimiter forgery, encoded payloads and zero-click tool coercion (EN + ZH)."
+signatures:
+  - id: pi-001
+    pattern: '(?i)\b(?:ignore|disregard|forget)\s+(?:all\s+|any\s+)?(?:the\s+)?(?:previous|prior|preceding|above|earlier)\s+(?:instructions?|prompts?|rules?|directions?)'
+    severity: high
+    confidence: 0.85
+    description: Classic instruction-override phrasing targeting prior context.
+    tags: [en, override, owasp-llm01]
+    references: ["https://owasp.org/www-project-top-10-for-large-language-model-applications/"]
+  - id: pi-002
+    pattern: '(?i)\bignore\s+(?:everything|all)\s+(?:you\s+were\s+told|above|before)'
+    severity: high
+    confidence: 0.8
+    description: Broad override of the entire preceding context.
+    tags: [en, override]
+  - id: pi-003
+    pattern: '忽略(?:掉)?(?:之前|以上|上述|前面|先前)(?:的)?(?:所有)?(?:指令|指示|提示|规则|要求)'
+    severity: high
+    confidence: 0.85
+    description: Chinese instruction-override phrasing.
+    tags: [zh, override]
+  - id: pi-004
+    pattern: '(?:无视|不要理会|不用管|抛开)(?:之前|上面|系统)(?:的)?(?:所有)?(?:指令|设定|规则|限制)'
+    severity: high
+    confidence: 0.8
+    description: Chinese variant telling the model to abandon its constraints.
+    tags: [zh, override]
+  - id: pi-005
+    pattern: '(?i)\bdisregard\s+(?:your\s+)?(?:system\s+prompt|guardrails?|safety\s+(?:rules?|guidelines?|policies))'
+    severity: critical
+    confidence: 0.88
+    description: Explicit request to drop safety guardrails.
+    tags: [en, override, guardrail]
+  - id: pi-006
+    pattern: '(?i)\byou\s+are\s+(?:now|hereafter|from\s+now\s+on)\s+(?:a|an|in)\b'
+    severity: medium
+    confidence: 0.6
+    description: Role reassignment preamble ("you are now a ...").
+    tags: [en, role_hijack]
+  - id: pi-007
+    pattern: '(?i)\b(?:act|behave|respond|pretend)\s+as\s+(?:if\s+you\s+(?:are|were)\s+)?(?:a|an|the)\s+(?:unrestricted|unfiltered|uncensored|jailbroken|developer|root|admin)'
+    severity: high
+    confidence: 0.85
+    description: Persona jailbreak requesting an unrestricted operating mode.
+    tags: [en, role_hijack, jailbreak]
+  - id: pi-008
+    pattern: '(?:你现在(?:是|扮演)|从现在开始你是|请扮演)(?:一个|一名)?(?:没有(?:任何)?限制|不受约束|越狱|开发者模式)'
+    severity: high
+    confidence: 0.85
+    description: Chinese persona jailbreak.
+    tags: [zh, role_hijack, jailbreak]
+  - id: pi-009
+    pattern: '(?i)\b(?:DAN|do\s+anything\s+now|developer\s+mode|god\s+mode|sudo\s+mode)\b'
+    severity: high
+    confidence: 0.7
+    description: Named jailbreak persona tokens.
+    tags: [en, jailbreak]
+  - id: pi-010
+    pattern: '(?i)(?:print|show|reveal|repeat|output|display|dump)\s+(?:me\s+)?(?:your|the)\s+(?:system\s+)?(?:prompt|instructions?|rules?|configuration|context)'
+    severity: high
+    confidence: 0.8
+    description: System-prompt extraction attempt.
+    tags: [en, prompt_leak]
+  - id: pi-011
+    pattern: '(?:输出|显示|展示|复述|重复|告诉我)(?:你的|完整的)?(?:系统)?(?:提示词|指令|prompt|设定|规则)'
+    severity: high
+    confidence: 0.8
+    description: Chinese system-prompt extraction attempt.
+    tags: [zh, prompt_leak]
+  - id: pi-012
+    pattern: '(?i)\brepeat\s+(?:the\s+)?(?:text|words?|content)\s+above\s+(?:verbatim|exactly|word\s+for\s+word)'
+    severity: high
+    confidence: 0.78
+    description: Verbatim-repeat trick used to dump the hidden context window.
+    tags: [en, prompt_leak]
+  - id: pi-013
+    pattern: '(?i)\bwhat\s+(?:were|are)\s+your\s+(?:original|initial|exact)\s+instructions'
+    severity: medium
+    confidence: 0.65
+    description: Conversational probe for the system prompt.
+    tags: [en, prompt_leak]
+  - id: pi-014
+    pattern: '(?i)<\s*/?\s*(?:system|assistant|user|im_start|im_end|s|INST)\s*[|>\]]'
+    severity: high
+    confidence: 0.8
+    description: Forged chat-template delimiter injected into content.
+    tags: [en, delimiter, template]
+  - id: pi-015
+    pattern: '(?i)(?:\|\s*(?:im_start|im_end|endoftext|system)\s*\|)'
+    severity: high
+    confidence: 0.82
+    description: ChatML control token smuggled into user-visible content.
+    tags: [en, delimiter, template]
+  - id: pi-016
+    pattern: '(?i)\[\s*(?:SYSTEM|INST|/INST|ASSISTANT|USER)\s*\]'
+    severity: medium
+    confidence: 0.6
+    description: Bracketed role delimiter forgery.
+    tags: [en, delimiter]
+  - id: pi-017
+    pattern: '(?i)^\s*###\s*(?:system|instruction|new\s+instruction)s?\s*:?\s*$'
+    severity: medium
+    confidence: 0.55
+    description: Markdown heading masquerading as a new system section.
+    flags: m
+    tags: [en, delimiter]
+  - id: pi-018
+    pattern: '(?i)\b(?:new|updated|revised|override)\s+(?:system\s+)?(?:instructions?|directives?|policy)\s*[:：]'
+    severity: high
+    confidence: 0.75
+    description: Injected block announcing replacement instructions.
+    tags: [en, override, delimiter]
+  - id: pi-019
+    pattern: '(?:新的|最新|更新后的)(?:系统)?(?:指令|要求|规则)\s*[:：]'
+    severity: high
+    confidence: 0.7
+    description: Chinese injected replacement-instruction block.
+    tags: [zh, override]
+  - id: pi-020
+    pattern: '(?i)\bthis\s+(?:is|message\s+is)\s+(?:a\s+)?(?:message|instruction)\s+from\s+(?:the\s+)?(?:developer|admin|system|openai|anthropic|your\s+creator)'
+    severity: high
+    confidence: 0.8
+    description: Authority spoofing - content claims to originate from the operator.
+    tags: [en, social_engineering, spoof]
+  - id: pi-021
+    pattern: '(?:我是|这是来自)(?:开发者|管理员|系统|官方)(?:的)?(?:消息|指令|通知)'
+    severity: high
+    confidence: 0.75
+    description: Chinese authority spoofing.
+    tags: [zh, social_engineering, spoof]
+  - id: pi-022
+    pattern: '(?i)\b(?:do\s+not|do\s*n.t|never)\s+(?:tell|inform|mention\s+(?:this\s+)?to|show|reveal\s+(?:this\s+)?to)\s+(?:the\s+)?user'
+    severity: critical
+    confidence: 0.88
+    description: Instructs the agent to hide its actions from the human - a hallmark of covert injection.
+    tags: [en, covert, social_engineering]
+  - id: pi-023
+    pattern: '(?:不要|请勿|切勿)(?:告诉|告知|通知|提醒)(?:用户|使用者|人类)'
+    severity: critical
+    confidence: 0.88
+    description: Chinese covert-operation instruction.
+    tags: [zh, covert]
+  - id: pi-024
+    pattern: '(?i)\bwithout\s+(?:asking|confirming|notifying|informing)\s+(?:the\s+)?(?:user|human|operator)'
+    severity: high
+    confidence: 0.8
+    description: Asks the agent to bypass human confirmation.
+    tags: [en, covert, approval_bypass]
+  - id: pi-025
+    pattern: '(?i)\b(?:silently|quietly|secretly|discreetly)\s+(?:execute|run|send|call|invoke|delete|forward)'
+    severity: high
+    confidence: 0.82
+    description: Covert-action adverb paired with a dangerous verb.
+    tags: [en, covert]
+  - id: pi-026
+    pattern: '(?i)\bimmediately\s+(?:call|invoke|use|execute|run)\s+(?:the\s+)?[a-z_]{3,40}\s*(?:tool|function|api)'
+    severity: high
+    confidence: 0.8
+    description: Content coerces the agent into a specific tool invocation.
+    tags: [en, tool_coercion, zero_click]
+  - id: pi-027
+    pattern: '(?i)\bcall\s+(?:the\s+)?(?:function|tool)\s+.?[a-z_][a-z0-9_.]{2,40}.?\s+with'
+    severity: high
+    confidence: 0.78
+    description: Explicit tool-call directive embedded in content.
+    tags: [en, tool_coercion]
+  - id: pi-028
+    pattern: '(?:立即|马上|请)(?:调用|执行|运行)(?:工具|函数|接口|命令)'
+    severity: high
+    confidence: 0.75
+    description: Chinese tool-coercion directive.
+    tags: [zh, tool_coercion]
+  - id: pi-029
+    pattern: '(?i)\bbefore\s+(?:answering|responding|replying)[^.?!]{0,60}(?:call|fetch|send|read|execute)'
+    severity: high
+    confidence: 0.75
+    description: Pre-response side effect - the zero-click injection pattern.
+    tags: [en, tool_coercion, zero_click]
+  - id: pi-030
+    pattern: '(?i)\b(?:base64|b64|rot13|hex|urlencode)\s*(?:decode|decoded?|:)\s*[A-Za-z0-9+/=]{20,}'
+    severity: high
+    confidence: 0.78
+    description: Encoded payload with an explicit decode instruction.
+    tags: [en, encoded, obfuscation]
+  - id: pi-031
+    pattern: '(?i)\bdecode\s+(?:the\s+)?following\s+(?:and\s+)?(?:then\s+)?(?:execute|run|follow|obey)'
+    severity: critical
+    confidence: 0.85
+    description: Decode-then-execute chain.
+    tags: [en, encoded, obfuscation]
+  - id: pi-032
+    pattern: '(?:解码|解密|base64\s*解)(?:后)?(?:执行|运行|按照|遵循)'
+    severity: critical
+    confidence: 0.82
+    description: Chinese decode-then-execute chain.
+    tags: [zh, encoded]
+  - id: pi-033
+    pattern: '(?i)\byour\s+(?:new\s+)?(?:primary\s+)?(?:goal|objective|task|mission)\s+is\s+(?:now\s+)?to\b'
+    severity: high
+    confidence: 0.72
+    description: Goal replacement - reassigns the agent's objective.
+    tags: [en, goal_hijack]
+  - id: pi-034
+    pattern: '(?:你的|新的)(?:首要|主要|真正)(?:目标|任务|使命)(?:是|变成)'
+    severity: high
+    confidence: 0.72
+    description: Chinese goal replacement.
+    tags: [zh, goal_hijack]
+  - id: pi-035
+    pattern: '(?i)\b(?:elevate|escalate|grant|give)\s+(?:yourself\s+)?(?:admin|root|superuser|full|elevated)\s+(?:privileges?|access|rights?|permissions?)'
+    severity: critical
+    confidence: 0.85
+    description: Privilege-escalation instruction.
+    tags: [en, privilege_escalation]
+  - id: pi-036
+    pattern: '(?i)\b(?:disable|turn\s+off|bypass|skip|circumvent)\s+(?:the\s+)?(?:security|safety|content|policy|approval|guardrail)\s*(?:filters?|checks?|controls?|gate)?'
+    severity: critical
+    confidence: 0.88
+    description: Request to disable enforcement controls.
+    tags: [en, guardrail, approval_bypass]
+  - id: pi-037
+    pattern: '(?:关闭|绕过|跳过|禁用)(?:安全|审批|策略|内容)(?:检查|过滤|机制|限制)'
+    severity: critical
+    confidence: 0.85
+    description: Chinese request to disable enforcement controls.
+    tags: [zh, guardrail]
+  - id: pi-038
+    pattern: '(?i)\bfor\s+(?:testing|debugging|research|educational)\s+purposes?\s+only[^.?!]{0,60}(?:ignore|bypass|disable|reveal)'
+    severity: medium
+    confidence: 0.65
+    description: Pretext framing followed by a bypass request.
+    tags: [en, social_engineering]
+  - id: pi-039
+    pattern: '(?i)\bthe\s+(?:previous|above)\s+(?:instructions?|rules?)\s+(?:were|was|are)\s+(?:a\s+)?(?:test|joke|mistake|outdated|no\s+longer\s+valid)'
+    severity: high
+    confidence: 0.8
+    description: Invalidates prior instructions to clear the way for new ones.
+    tags: [en, override, social_engineering]
+  - id: pi-040
+    pattern: '(?i)\bsystem\s*[:：]\s*(?:you\s+(?:must|should|will|are)|new\s+directive)'
+    severity: high
+    confidence: 0.78
+    description: Fake system turn injected into user content.
+    tags: [en, delimiter, spoof]
+  - id: pi-041
+    pattern: '(?i)\bend\s+of\s+(?:system\s+)?(?:prompt|instructions?|context)\b'
+    severity: medium
+    confidence: 0.6
+    description: Attempts to terminate the system context early.
+    tags: [en, delimiter]
+  - id: pi-042
+    pattern: '(?i)\bcontinue\s+(?:as|in)\s+(?:jailbroken|unrestricted|uncensored|unfiltered)\s+mode'
+    severity: high
+    confidence: 0.85
+    description: Persistent jailbreak-mode request.
+    tags: [en, jailbreak]
+  - id: pi-043
+    pattern: '(?i)\bhypothetically[^.?!]{0,80}\b(?:how\s+would\s+you|you\s+would)\s+(?:bypass|ignore|disable|hack)'
+    severity: medium
+    confidence: 0.6
+    description: Hypothetical framing used to elicit prohibited behaviour.
+    tags: [en, social_engineering]
+  - id: pi-044
+    pattern: '(?i)\btranslate\s+the\s+following[^.?!]{0,40}\bthen\s+(?:execute|follow|do|run)'
+    severity: high
+    confidence: 0.75
+    description: Task laundering - translation wrapper hiding an execution order.
+    tags: [en, obfuscation, tool_coercion]
+  - id: pi-045
+    pattern: '(?i)\b(?:AI|assistant|model|agent)\s+(?:override|jailbreak|unlock)\s+(?:code|key|token)\s*[:=]'
+    severity: high
+    confidence: 0.7
+    description: Fake unlock-code preamble.
+    tags: [en, jailbreak, spoof]

@@ -1,0 +1,24 @@
+# Shell argument risk rules for AegisAgent.
+# Each rule watches an argument field (usually `arguments.command`) and raises
+# the risk when the value matches a dangerous pattern.  `op: matches` uses an
+# IGNORECASE + DOTALL regex.  Double backslashes are literal regex escapes.
+id: shell
+version: "2026.08.11"
+rules:
+  - { id: sh-001, field: arguments.command, op: matches, value: "rm\\s+-[a-zA-Z]*[rf]", category: destructive, risk: critical, description: "递归强制删除", remediation: "改用软删除或加 --dry-run 预演" }
+  - { id: sh-002, field: arguments.command, op: matches, value: "rm\\s+-rf\\s+/", category: destructive, risk: critical, description: "从根目录递归强制删除", remediation: "禁止根路径递归删除；使用回收站策略" }
+  - { id: sh-003, field: arguments.command, op: matches, value: "mkfs", category: destructive, risk: critical, description: "格式化文件系统", remediation: "格式化不可逆，需人工审批并确认目标盘" }
+  - { id: sh-004, field: arguments.command, op: matches, value: "dd\\s+if=", category: destructive, risk: critical, description: "块级磁盘写入 (dd if=)", remediation: "确认源与目标，避免覆盖系统盘" }
+  - { id: sh-005, field: arguments.command, op: matches, value: "shred", category: destructive, risk: critical, description: "安全擦除文件", remediation: "擦除不可逆，需审批" }
+  - { id: sh-006, field: arguments.command, op: matches, value: ":(){:\\|\\|:&};:", category: destructive, risk: critical, description: "Fork 炸弹", remediation: "限制进程数并禁止 fork 炸弹" }
+  - { id: sh-007, field: arguments.command, op: matches, value: "chmod\\s+-R\\s+777", category: config, risk: high, description: "递归开放全部权限", remediation: "按最小权限分配，避免 777" }
+  - { id: sh-008, field: arguments.command, op: matches, value: "chown\\s+-R", category: config, risk: high, description: "递归变更属主", remediation: "确认属主变更范围" }
+  - { id: sh-009, field: arguments.command, op: matches, value: "sudo\\s+", category: identity, risk: high, description: "提权执行", remediation: "确认为何需要提权，限制 NOPASSWD" }
+  - { id: sh-010, field: arguments.command, op: matches, value: ">/etc/|>>/etc/|/etc/shadow|/etc/passwd", category: secret, risk: critical, description: "写入系统敏感文件", remediation: "仅允许受管配置管理写入 /etc" }
+  - { id: sh-011, field: arguments.command, op: matches, value: "curl\\s+.+\\|\\s*(sudo\\s+)?(ba|z|k|)sh", category: execute, risk: critical, description: "远程脚本直接管道执行", remediation: "禁止 curl|sh；改为校验后分步执行" }
+  - { id: sh-012, field: arguments.command, op: matches, value: "wget\\s+.+\\|\\s*(sudo\\s+)?(ba|z|k|)sh", category: execute, risk: critical, description: "下载脚本直接管道执行", remediation: "禁止 wget|sh" }
+  - { id: sh-013, field: arguments.command, op: matches, value: "crontab\\s+-r", category: config, risk: high, description: "清空计划任务", remediation: "删除单条任务而非清空" }
+  - { id: sh-014, field: arguments.command, op: matches, value: "systemctl\\s+(stop|disable|mask)", category: deploy, risk: high, description: "停止/禁用系统服务", remediation: "生产环境停服需审批" }
+  - { id: sh-015, field: arguments.command, op: matches, value: "kill\\s+-9|pkill|killall", category: destructive, risk: high, description: "强制结束进程", remediation: "确认目标进程，避免误杀关键服务" }
+  - { id: sh-016, field: arguments.command, op: matches, value: "iptables|ufw\\s+(delete|disable)", category: config, risk: high, description: "变更防火墙规则", remediation: "网络边界变更需审批" }
+  - { id: sh-017, field: arguments.command, op: matches, value: ">(/dev/sd|/dev/nvme|/dev/sda)", category: destructive, risk: critical, description: "直接写入块设备", remediation: "禁止向裸块设备写入" }

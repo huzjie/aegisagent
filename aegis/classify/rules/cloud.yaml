@@ -1,0 +1,22 @@
+# Cloud API argument risk rules for AegisAgent.
+# Watches `arguments` (whole call) for destructive cloud control-plane actions
+# across AWS / GCP / Azure / Kubernetes.
+id: cloud
+version: "2026.08.11"
+rules:
+  - { id: cloud-001, field: arguments, op: matches, value: "DeleteBucket|delete_bucket", category: destructive, risk: critical, description: "删除 S3 存储桶", remediation: "桶删除不可逆；生产需审批+确认版本" }
+  - { id: cloud-002, field: arguments, op: matches, value: "TerminateInstances|terminate_instances", category: destructive, risk: high, description: "终止计算实例", remediation: "确认实例归属与是否生产" }
+  - { id: cloud-003, field: arguments, op: matches, value: "DeleteDBInstance|delete_db_instance", category: destructive, risk: critical, description: "删除数据库实例", remediation: "确认有备份且非生产主库" }
+  - { id: cloud-004, field: arguments, op: matches, value: "RevokeSecurityGroupIngress|revoke_security_group", category: config, risk: high, description: "回收安全组入站规则", remediation: "回收规则可能暴露或隔离服务" }
+  - { id: cloud-005, field: arguments, op: matches, value: "iam:DeleteRole|DeleteAccessKey|delete_access_key", category: identity, risk: critical, description: "删除 IAM 角色/密钥", remediation: "身份删除需审批" }
+  - { id: cloud-006, field: arguments, op: matches, value: "iam:PutRolePolicy|AttachUserPolicy|attach_role_policy", category: identity, risk: critical, description: "绑定 IAM 权限策略", remediation: "避免绑定 Administrator/通配策略" }
+  - { id: cloud-007, field: arguments, op: matches, value: "--all-namespaces|AllNamespaces", category: deploy, risk: critical, description: "K8s 跨全部命名空间操作", remediation: "禁止全集群操作，限定命名空间" }
+  - { id: cloud-008, field: arguments, op: matches, value: "kubectl\\s+delete\\s+ns|DeleteNamespace", category: destructive, risk: critical, description: "删除 K8s 命名空间", remediation: "命名空间删除级联销毁所有资源" }
+  - { id: cloud-009, field: arguments, op: matches, value: "kubectl\\s+delete\\s+--all|delete\\s+--all", category: destructive, risk: critical, description: "K8s 全量删除", remediation: "禁止 --all 批量删除" }
+  - { id: cloud-010, field: arguments, op: matches, value: "gcloud\\s+projects\\s+delete|projects\\.delete", category: destructive, risk: critical, description: "删除 GCP 项目", remediation: "项目删除不可逆，需多重确认" }
+  - { id: cloud-011, field: arguments, op: matches, value: "az\\s+group\\s+delete|DeleteResourceGroup", category: destructive, risk: critical, description: "删除 Azure 资源组", remediation: "资源组删除级联销毁" }
+  - { id: cloud-012, field: arguments, op: matches, value: "CreateImage|create_snapshot|Snapshot", category: deploy, risk: medium, description: "创建镜像/快照", remediation: "快照确认来源磁盘" }
+  - { id: cloud-013, field: arguments, op: matches, value: "DisableRule|delete_rule|DeleteFirewall", category: config, risk: high, description: "禁用防火墙/规则", remediation: "边界规则变更需审批" }
+  - { id: cloud-014, field: arguments, op: matches, value: "SetIamPolicy|setIamPolicy", category: identity, risk: high, description: "设置 IAM 策略", remediation: "确认策略不包含通配主体" }
+  - { id: cloud-015, field: arguments, op: matches, value: "scale\\s+(--replicas=0|replicas:0)|desired-count\\s+0", category: deploy, risk: high, description: "缩容到 0（停服）", remediation: "生产缩容到 0 需审批" }
+  - { id: cloud-016, field: arguments, op: matches, value: "UpdateFunctionCode|update_function_code", category: deploy, risk: medium, description: "更新函数代码", remediation: "确认代码来源与校验" }

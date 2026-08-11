@@ -1,0 +1,148 @@
+id: exfiltration
+version: "2026.08.1"
+description: "Data-exfiltration signatures: drop sites, markdown-image beacons, DNS tunnelling and outbound instruction phrasing."
+signatures:
+  - id: exf-001
+    pattern: '(?i)https?://(?:[a-z0-9-]+\.)*(?:webhook\.site|requestbin\.(?:com|net)|pipedream\.net|requestcatcher\.com|hookb\.in|beeceptor\.com|mockbin\.org|postb\.in)'
+    severity: high
+    confidence: 0.9
+    description: URL points at a request-capture service used as an exfiltration sink.
+    tags: [en, sink, webhook]
+  - id: exf-002
+    pattern: '(?i)https?://(?:[a-z0-9-]+\.)*(?:interact\.sh|oast\.(?:fun|pro|live|site)|burpcollaborator\.net|dnslog\.cn|ceye\.io|canarytokens\.com)'
+    severity: critical
+    confidence: 0.92
+    description: Out-of-band interaction endpoint (OAST) typical of blind exfiltration.
+    tags: [en, sink, oast]
+  - id: exf-003
+    pattern: '(?i)https?://(?:[a-z0-9-]+\.)*(?:pastebin\.com|paste\.ee|hastebin\.com|ghostbin\.com|dpaste\.com|0bin\.net|privatebin\.net|termbin\.com)'
+    severity: high
+    confidence: 0.85
+    description: Anonymous paste service used to publish stolen data.
+    tags: [en, sink, paste]
+  - id: exf-004
+    pattern: '(?i)https?://(?:[a-z0-9-]+\.)*(?:transfer\.sh|file\.io|anonfiles\.com|gofile\.io|catbox\.moe|bashupload\.com|0x0\.st)'
+    severity: high
+    confidence: 0.85
+    description: Anonymous file-drop service.
+    tags: [en, sink, filedrop]
+  - id: exf-005
+    pattern: '(?i)https?://(?:[a-z0-9-]+\.)*(?:ngrok(?:-free)?\.(?:io|app)|trycloudflare\.com|loca\.lt|serveo\.net|localhost\.run|bore\.pub|tunnelto\.dev)'
+    severity: critical
+    confidence: 0.88
+    description: Reverse-tunnel endpoint exposing internal services to the internet.
+    tags: [en, sink, tunnel]
+  - id: exf-006
+    pattern: '!\[[^\]]{0,120}\]\(\s*https?://[^)\s]{0,200}[?&][a-z0-9_]{1,20}=[^)\s]{16,}'
+    severity: critical
+    confidence: 0.85
+    description: Markdown image whose URL carries a long query payload - the classic zero-click render-time beacon.
+    tags: [en, markdown, beacon, zero_click]
+  - id: exf-007
+    pattern: '(?i)<img\b[^>]{0,200}\bsrc\s*=\s*["'']?https?://[^"''>\s]{0,200}[?&][a-z0-9_]{1,20}=\{'
+    severity: critical
+    confidence: 0.85
+    description: HTML image beacon with a templated data placeholder in the URL.
+    tags: [en, html, beacon]
+  - id: exf-008
+    pattern: '(?i)[?&](?:data|payload|q|content|secret|token|key|dump|leak|body|c|d)=\$\{?[a-z_][a-z0-9_]{2,40}\}?'
+    severity: high
+    confidence: 0.8
+    description: URL query parameter interpolating a variable - data smuggled into a GET.
+    tags: [en, beacon, interpolation]
+  - id: exf-009
+    pattern: '(?i)\b(?:curl|wget)\b[^\n]{0,120}\s(?:-d|--data(?:-raw|-binary)?|--form)\s'
+    severity: medium
+    confidence: 0.6
+    description: Command-line HTTP POST carrying a body - candidate outbound transfer.
+    tags: [en, http, post]
+  - id: exf-010
+    pattern: '(?i)\b(?:nslookup|dig|host)\s+[a-z0-9+/=]{20,}\.[a-z0-9-]+\.[a-z]{2,}'
+    severity: critical
+    confidence: 0.85
+    description: DNS lookup of an encoded subdomain - DNS exfiltration channel.
+    tags: [en, dns, tunnel]
+  - id: exf-011
+    pattern: '(?i)\b[a-z0-9+/=]{32,}\.(?:[a-z0-9-]{1,30}\.)?(?:oast|interact|dnslog|burpcollaborator|ceye)\b'
+    severity: critical
+    confidence: 0.9
+    description: Encoded data prefixed onto an OAST domain.
+    tags: [en, dns, oast]
+  - id: exf-012
+    pattern: '(?i)\b(?:send|post|upload|forward|transmit)\b[^.?!\n]{0,60}\b(?:to|at)\b[^.?!\n]{0,40}https?://'
+    severity: high
+    confidence: 0.7
+    description: Natural-language instruction to send content to a URL.
+    tags: [en, instruction]
+  - id: exf-013
+    pattern: '(?:发送|上传|传送|转发|提交)[^。！？\n]{0,30}(?:到|至|给)[^。！？\n]{0,30}https?://'
+    severity: high
+    confidence: 0.7
+    description: Chinese instruction to send content to a URL.
+    tags: [zh, instruction]
+  - id: exf-014
+    pattern: '(?i)\b(?:read|cat|open|load)\b[^.?!\n]{0,50}(?:\.env|id_rsa|credentials|\.aws|\.kube|secrets?)\b[^.?!\n]{0,80}\b(?:send|post|upload|exfil)'
+    severity: critical
+    confidence: 0.92
+    description: Read-secret then send-out chain in a single instruction.
+    tags: [en, chain, credential]
+  - id: exf-015
+    pattern: '(?i)\bbase64\b[^\n]{0,40}\|\s*(?:curl|wget|nc|ncat)\b'
+    severity: critical
+    confidence: 0.9
+    description: Encode-and-ship one-liner.
+    tags: [en, chain, encode]
+  - id: exf-016
+    pattern: '(?i)\b(?:nc|ncat|netcat)\s+(?:-[a-z]+\s+)*[a-z0-9.-]+\s+\d{2,5}\s*<'
+    severity: critical
+    confidence: 0.88
+    description: Netcat used to stream a file to a remote listener.
+    tags: [en, netcat, tunnel]
+  - id: exf-017
+    pattern: '(?i)\bmailto:[^\s"''<>]{3,80}\?(?:subject|body)='
+    severity: medium
+    confidence: 0.6
+    description: Pre-filled mailto link used to smuggle content out via email.
+    tags: [en, email, beacon]
+  - id: exf-018
+    pattern: '(?i)\bhttps?://(?:[a-z0-9-]+\.)*(?:bit\.ly|tinyurl\.com|t\.co|is\.gd|cutt\.ly|rb\.gy|shorturl\.at)/'
+    severity: medium
+    confidence: 0.6
+    description: URL shortener hides the true destination from allowlists and reviewers.
+    tags: [en, shortener]
+  - id: exf-019
+    pattern: '(?i)\b(?:copy|attach|include|append)\b[^.?!\n]{0,40}\b(?:conversation|chat\s+history|context|system\s+prompt)\b[^.?!\n]{0,40}\b(?:url|link|request|body|image)'
+    severity: critical
+    confidence: 0.85
+    description: Instruction to embed the conversation into an outbound artefact.
+    tags: [en, instruction, prompt_leak]
+  - id: exf-020
+    pattern: '(?i)\bhttps?://[^\s"''<>]{0,120}/(?:collect|beacon|log|track|report|ingest|pixel|gif)\b'
+    severity: medium
+    confidence: 0.55
+    description: URL path names a telemetry collection endpoint.
+    tags: [en, beacon]
+  - id: exf-021
+    pattern: '(?i)\bfetch\s*\(\s*[`"''][^`"'']{0,160}\$\{'
+    severity: high
+    confidence: 0.75
+    description: JavaScript fetch with template interpolation - browser-side beacon.
+    tags: [en, javascript, beacon]
+  - id: exf-022
+    pattern: '(?i)\bnew\s+Image\s*\(\s*\)\s*\.\s*src\s*='
+    severity: high
+    confidence: 0.8
+    description: Image-object beacon, a no-CORS exfiltration primitive.
+    tags: [en, javascript, beacon]
+  - id: exf-023
+    pattern: '(?i)\bnavigator\s*\.\s*sendBeacon\s*\('
+    severity: high
+    confidence: 0.8
+    description: sendBeacon call - fire-and-forget outbound transfer.
+    tags: [en, javascript, beacon]
+  - id: exf-024
+    pattern: '(?i)\bhttps?://\d{1,3}(?:\.\d{1,3}){3}(?::\d{2,5})?/'
+    severity: medium
+    confidence: 0.5
+    description: Raw IP destination bypasses domain allowlisting.
+    tags: [en, ip_literal]

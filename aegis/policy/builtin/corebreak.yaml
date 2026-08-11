@@ -1,0 +1,113 @@
+id: corebreak
+name: CoreBreak Provenance Defense
+version: "2026.08.11"
+description: Direct defence against the CoreBreak vulnerability family disclosed by the CSA in 2026-08.
+defaults:
+  effect: require_approval
+rules:
+  - id: corebreak-unsigned-call
+    description: A tool call carrying no attestation at all is the raw CoreBreak injection primitive.
+    priority: 1000
+    effect: deny
+    references: [CVE-2026-18830, OWASP-LLM06]
+    when:
+      all:
+        - { field: provenance.status, op: eq, value: unsigned }
+  - id: corebreak-orphaned-call
+    description: Tool call cannot be linked to any recorded model completion - the model never ran.
+    priority: 1000
+    effect: deny
+    references: [CVE-2026-18830, OWASP-LLM06]
+    when:
+      all:
+        - { field: provenance.status, op: eq, value: orphaned }
+  - id: corebreak-forged-call
+    description: Attestation signature does not verify against the gateway key - the token was forged.
+    priority: 1000
+    effect: deny
+    references: [CVE-2026-18830, CVE-2026-64650]
+    when:
+      all:
+        - { field: provenance.status, op: eq, value: forged }
+  - id: corebreak-untrusted-issuer
+    description: Valid signature but minted by a key outside the trusted issuer set.
+    priority: 1000
+    effect: deny
+    references: [CVE-2026-64651]
+    when:
+      all:
+        - { field: provenance.status, op: eq, value: untrusted_issuer }
+  - id: corebreak-mismatched-call
+    description: Completion ran but never asked for this tool, or the arguments were altered afterwards.
+    priority: 1000
+    effect: deny
+    references: [CVE-2026-18236]
+    when:
+      all:
+        - { field: provenance.status, op: eq, value: mismatched }
+  - id: corebreak-replayed-nonce
+    description: A previously spent attestation nonce was presented again - single authorisation reused.
+    priority: 1000
+    effect: deny
+    references: [CVE-2026-64650, CVE-2026-64651]
+    when:
+      all:
+        - { field: provenance.status, op: eq, value: replayed }
+  - id: corebreak-expired-attestation
+    description: Structurally sound but stale beyond max_age + clock skew tolerance.
+    priority: 960
+    effect: deny
+    references: [CVE-2026-64650]
+    when:
+      all:
+        - { field: provenance.status, op: eq, value: expired }
+  - id: corebreak-missing-attestation-monitor
+    description: Missing attestation (attestation disabled) is recorded and observed, not silently allowed.
+    priority: 940
+    effect: observe
+    references: [OWASP-LLM06]
+    when:
+      all:
+        - { field: provenance.status, op: eq, value: missing }
+  - id: corebreak-cross-session-reuse
+    description: Attestation issued for one session presented on a different session.
+    priority: 980
+    effect: deny
+    references: [CVE-2026-18236, OWASP-LLM06]
+    when:
+      all:
+        - { field: extra.cross_session, op: eq, value: true }
+  - id: corebreak-api-injected-tool
+    description: Tool calls whose source is the raw API (not the model) are quarantined unless verified.
+    priority: 970
+    effect: require_approval
+    references: [CVE-2026-18830]
+    when:
+      all:
+        - { field: call.source, op: eq, value: api }
+        - { field: provenance.status, op: ne, value: verified }
+  - id: corebreak-replay-attack-block
+    description: Detected replay pattern (duplicate nonce across sessions) triggers session quarantine.
+    priority: 990
+    effect: quarantine
+    references: [CVE-2026-64650, CVE-2026-64651]
+    when:
+      all:
+        - { field: extra.replay_pattern, op: eq, value: true }
+  - id: corebreak-confirmation-spoof
+    description: Forged human-approval confirmation event without a bound completion is denied.
+    priority: 985
+    effect: deny
+    references: [CVE-2026-18236, OWASP-LLM06]
+    when:
+      all:
+        - { field: call.source, op: eq, value: orchestrator }
+        - { field: provenance.status, op: ne, value: verified }
+  - id: corebreak-verified-allow
+    description: Calls cryptographically bound to a real completion clear the provenance gate.
+    priority: 50
+    effect: allow
+    references: [CVE-2026-18830, CVE-2026-18236, CVE-2026-64650]
+    when:
+      all:
+        - { field: provenance.status, op: eq, value: verified }

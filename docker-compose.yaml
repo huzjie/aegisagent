@@ -1,0 +1,80 @@
+version: "3.9"
+
+services:
+  # AegisAgent Security Gateway
+  aegis-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aegis-server
+    ports:
+      - "8901:8901"   # HTTP API
+      - "8902:8902"   # WebSocket (approval notifications)
+    volumes:
+      - aegis-config:/etc/aegis
+      - aegis-data:/var/lib/aegis
+      - aegis-logs:/var/log/aegis
+    environment:
+      - AEGIS_LOG_LEVEL=info
+      - AEGIS_POLICY_DIR=/etc/aegis/policy
+      - AEGIS_AUDIT_BACKEND=file
+      - AEGIS_AUDIT_PATH=/var/lib/aegis/audit.jsonl
+    restart: unless-stopped
+    networks:
+      - aegis-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8901/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Example Agent (for demonstration)
+  example-agent:
+    image: python:3.12-slim
+    container_name: example-agent
+    working_dir: /app
+    volumes:
+      - ./examples:/app/examples:ro
+    command: >
+      bash -c "pip install --no-cache-dir aegisagent[all] &&
+               python /app/examples/quickstart.py"
+    depends_on:
+      aegis-server:
+        condition: service_healthy
+    environment:
+      - AEGIS_GATEWAY_URL=http://aegis-server:8901
+    networks:
+      - aegis-net
+    profiles:
+      - examples
+
+  # MCP Server (optional)
+  mcp-server:
+    image: python:3.12-slim
+    container_name: mcp-server
+    working_dir: /app
+    volumes:
+      - ./examples:/app/examples:ro
+    command: >
+      bash -c "pip install --no-cache-dir aegisagent[all] &&
+               python /app/examples/mcp_proxy.py"
+    depends_on:
+      aegis-server:
+        condition: service_healthy
+    environment:
+      - AEGIS_GATEWAY_URL=http://aegis-server:8901
+    ports:
+      - "8910:8910"
+    networks:
+      - aegis-net
+    profiles:
+      - mcp
+
+volumes:
+  aegis-config:
+  aegis-data:
+  aegis-logs:
+
+networks:
+  aegis-net:
+    driver: bridge

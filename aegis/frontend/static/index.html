@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AegisAgent Console</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: system-ui, -apple-system, sans-serif;
+  display: flex;
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.6;
+}
+/* ── 侧栏 ── */
+.sidebar {
+  width: 240px;
+  min-width: 240px;
+  background: #1e293b;
+  border-right: 1px solid #334155;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  z-index: 100;
+  transition: transform .25s;
+}
+.sidebar.collapsed { transform: translateX(-240px); }
+.sidebar-header {
+  padding: 24px 20px 16px;
+  border-bottom: 1px solid #334155;
+}
+.sidebar-header .logo {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -.5px;
+}
+.sidebar-header .logo span { color: #E60012; }
+.sidebar-header .version {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 4px;
+}
+.nav-list { list-style: none; padding: 12px 0; flex: 1; overflow-y: auto; }
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  cursor: pointer;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all .15s;
+  border-left: 3px solid transparent;
+}
+.nav-item:hover { background: #334155; color: #e2e8f0; }
+.nav-item.active {
+  background: rgba(230,0,18,.08);
+  color: #E60012;
+  border-left-color: #E60012;
+}
+.nav-item .icon { width: 18px; text-align: center; font-size: 15px; }
+/* ── 主内容 ── */
+.main {
+  margin-left: 240px;
+  flex: 1;
+  padding: 28px 32px;
+  min-height: 100vh;
+  transition: margin-left .25s;
+}
+.main.expanded { margin-left: 0; }
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+.topbar h1 { font-size: 22px; font-weight: 700; color: #fff; }
+.toggle-btn {
+  display: none;
+  background: #334155;
+  border: none;
+  color: #e2e8f0;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+}
+/* ── 页面 ── */
+.page { display: none; }
+.page.active { display: block; }
+/* ── 卡片 ── */
+.card {
+  background: #1e293b;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.card h3 { font-size: 15px; color: #fff; margin-bottom: 14px; font-weight: 600; }
+/* ── 统计卡片网格 ── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  background: #1e293b;
+  border-radius: 8px;
+  padding: 20px;
+  border-left: 4px solid #E60012;
+}
+.stat-card .label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: .5px; }
+.stat-card .value { font-size: 30px; font-weight: 700; color: #fff; margin: 6px 0 2px; }
+.stat-card .sub { font-size: 12px; color: #64748b; }
+.stat-card.green { border-left-color: #22c55e; }
+.stat-card.yellow { border-left-color: #eab308; }
+.stat-card.blue { border-left-color: #3b82f6; }
+/* ── 表格 ── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th {
+  text-align: left;
+  padding: 10px 12px;
+  color: #94a3b8;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  border-bottom: 1px solid #334155;
+}
+tbody tr:nth-child(odd) { background: #1e293b; }
+tbody tr:nth-child(even) { background: #0f172a; }
+tbody td { padding: 10px 12px; border-bottom: 1px solid #1e293b; }
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.badge.allow { background: rgba(34,197,94,.15); color: #22c55e; }
+.badge.deny { background: rgba(230,0,18,.15); color: #E60012; }
+.badge.warn { background: rgba(234,179,8,.15); color: #eab308; }
+.badge.info { background: rgba(59,130,246,.15); color: #3b82f6; }
+/* ── 搜索 ── */
+.search-input {
+  background: #0f172a;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  width: 280px;
+  margin-bottom: 16px;
+  outline: none;
+}
+.search-input:focus { border-color: #E60012; }
+/* ── 时间线 ── */
+.timeline { position: relative; padding-left: 28px; }
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 8px; top: 0; bottom: 0;
+  width: 2px;
+  background: #334155;
+}
+.timeline-item { position: relative; margin-bottom: 20px; }
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -24px; top: 6px;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #E60012;
+  border: 2px solid #0f172a;
+}
+.timeline-item.safe::before { background: #22c55e; }
+.timeline-item .time { font-size: 11px; color: #64748b; }
+.timeline-item .desc { font-size: 13px; color: #e2e8f0; margin-top: 2px; }
+.timeline-item .detail { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+.chain-ok { color: #22c55e; font-weight: 700; }
+/* ── 按钮 ── */
+.btn {
+  display: inline-block;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background .15s;
+}
+.btn-primary { background: #E60012; color: #fff; }
+.btn-primary:hover { background: #b3000e; }
+.btn-outline {
+  background: transparent;
+  border: 1px solid #334155;
+  color: #94a3b8;
+}
+.btn-outline:hover { border-color: #E60012; color: #E60012; }
+.btn-approve { background: #22c55e; color: #fff; }
+.btn-approve:hover { background: #16a34a; }
+.btn-reject { background: #E60012; color: #fff; }
+.btn-reject:hover { background: #b3000e; }
+/* ── 柱状图 (纯 CSS) ── */
+.bar-chart { display: flex; align-items: flex-end; gap: 14px; height: 160px; padding-top: 10px; }
+.bar-col { display: flex; flex-direction: column; align-items: center; flex: 1; }
+.bar {
+  width: 100%;
+  max-width: 42px;
+  border-radius: 4px 4px 0 0;
+  background: #E60012;
+  transition: height .4s;
+}
+.bar-col .bar-label { font-size: 11px; color: #94a3b8; margin-top: 6px; }
+.bar-col .bar-value { font-size: 11px; color: #fff; margin-bottom: 4px; }
+/* ── 策略模拟器 ── */
+textarea.sim-input {
+  width: 100%;
+  min-height: 120px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  padding: 12px;
+  border-radius: 6px;
+  resize: vertical;
+  outline: none;
+}
+textarea.sim-input:focus { border-color: #E60012; }
+.sim-result {
+  margin-top: 14px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 14px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  white-space: pre-wrap;
+  min-height: 60px;
+}
+/* ── 供应商健康卡 ── */
+.vendor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.vendor-card {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 14px;
+  text-align: center;
+}
+.vendor-card .vname { font-size: 13px; font-weight: 600; color: #fff; }
+.vendor-card .vstatus { font-size: 12px; margin-top: 6px; }
+.vendor-card .vlatency { font-size: 11px; color: #64748b; margin-top: 4px; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+.dot.green { background: #22c55e; }
+.dot.red { background: #E60012; }
+.dot.yellow { background: #eab308; }
+/* ── 审批卡 ── */
+.approval-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 18px;
+  margin-bottom: 14px;
+}
+.approval-card .a-title { font-size: 14px; font-weight: 600; color: #fff; }
+.approval-card .a-meta { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+.approval-card .a-actions { margin-top: 12px; display: flex; gap: 8px; }
+/* ── JSON 展示 ── */
+.json-block {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 16px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  max-height: 500px;
+  overflow-y: auto;
+}
+/* ── 响应式 ── */
+@media (max-width: 768px) {
+  .sidebar { transform: translateX(-240px); }
+  .sidebar.open { transform: translateX(0); }
+  .main { margin-left: 0; }
+  .toggle-btn { display: inline-block; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ 侧栏 ═══════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="logo">Aegis<span>Agent</span></div>
+    <div class="version" id="version-label">v0.0.0</div>
+  </div>
+  <ul class="nav-list">
+    <li class="nav-item active" data-page="dashboard"><span class="icon">&#9632;</span> Dashboard</li>
+    <li class="nav-item" data-page="decisions"><span class="icon">&#9670;</span> Decisions</li>
+    <li class="nav-item" data-page="audit"><span class="icon">&#9679;</span> Audit</li>
+    <li class="nav-item" data-page="policy"><span class="icon">&#9654;</span> Policy</li>
+    <li class="nav-item" data-page="tools"><span class="icon">&#9881;</span> Tools</li>
+    <li class="nav-item" data-page="mcp"><span class="icon">&#9733;</span> MCP</li>
+    <li class="nav-item" data-page="approvals"><span class="icon">&#9998;</span> Approvals</li>
+    <li class="nav-item" data-page="gateway"><span class="icon">&#9741;</span> Gateway</li>
+    <li class="nav-item" data-page="settings"><span class="icon">&#9881;</span> Settings</li>
+  </ul>
+</aside>
+
+<!-- ═══════════ 主内容 ═══════════ -->
+<div class="main" id="main">
+  <div class="topbar">
+    <button class="toggle-btn" id="toggleBtn">&#9776;</button>
+    <h1 id="page-title">Dashboard</h1>
+    <div style="font-size:12px;color:#64748b;">AegisAgent Security Console</div>
+  </div>
+
+  <!-- ── Dashboard ── -->
+  <div class="page active" id="page-dashboard">
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="label">Today's Decisions</div>
+        <div class="value" id="stat-decisions">1,284</div>
+        <div class="sub">+12.3% vs yesterday</div>
+      </div>
+      <div class="stat-card green">
+        <div class="label">Block Rate</div>
+        <div class="value">3.2%</div>
+        <div class="sub">41 threats blocked</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="label">Active Policies</div>
+        <div class="value">47</div>
+        <div class="sub">3 updated today</div>
+      </div>
+      <div class="stat-card yellow">
+        <div class="label">Pending Approvals</div>
+        <div class="value" id="stat-approvals">5</div>
+        <div class="sub">2 high-priority</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div class="card">
+        <h3>Recent Decisions</h3>
+        <div class="timeline" id="dashboard-timeline"></div>
+      </div>
+      <div class="card">
+        <h3>Risk Distribution (7 days)</h3>
+        <div class="bar-chart" id="bar-chart"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Decisions ── -->
+  <div class="page" id="page-decisions">
+    <input type="text" class="search-input" id="decision-search" placeholder="Search decisions...">
+    <div class="card">
+      <div class="table-wrap">
+        <table id="decisions-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Time</th>
+              <th>Agent</th>
+              <th>Tool</th>
+              <th>Effect</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody id="decisions-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Audit ── -->
+  <div class="page" id="page-audit">
+    <div class="card">
+      <h3>Audit Trail <span class="chain-ok" style="font-size:12px;margin-left:8px;">&#10003; Chain Integrity Verified</span></h3>
+      <div class="timeline" id="audit-timeline"></div>
+    </div>
+  </div>
+
+  <!-- ── Policy ── -->
+  <div class="page" id="page-policy">
+    <div class="card">
+      <h3>Active Policy Rules</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Rule ID</th><th>Name</th><th>Condition</th><th>Effect</th><th>Priority</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>R-001</td><td>Block Prompt Injection</td><td>input matches injection_pattern</td><td><span class="badge deny">DENY</span></td><td>1</td></tr>
+            <tr><td>R-002</td><td>Sandbox Escape Guard</td><td>tool.name == exec && args contains escape_seq</td><td><span class="badge deny">DENY</span></td><td>2</td></tr>
+            <tr><td>R-003</td><td>Secret Leak Prevention</td><td>output matches secret_pattern</td><td><span class="badge deny">DENY</span></td><td>3</td></tr>
+            <tr><td>R-004</td><td>Rate Limit Per Agent</td><td>agent.calls > 100/min</td><td><span class="badge warn">THROTTLE</span></td><td>4</td></tr>
+            <tr><td>R-005</td><td>Require Approval for File Write</td><td>tool.name == file_write</td><td><span class="badge info">REQUIRE_APPROVAL</span></td><td>5</td></tr>
+            <tr><td>R-006</td><td>Allow Read-Only Ops</td><td>tool.category == read_only</td><td><span class="badge allow">ALLOW</span></td><td>10</td></tr>
+            <tr><td>R-007</td><td>Block Unregistered Tools</td><td>tool NOT IN registered_tools</td><td><span class="badge deny">DENY</span></td><td>1</td></tr>
+            <tr><td>R-008</td><td>Log All External Calls</td><td>tool.category == external_api</td><td><span class="badge info">LOG</span></td><td>8</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Policy Simulator</h3>
+      <p style="font-size:12px;color:#94a3b8;margin-bottom:10px;">Paste a tool-call JSON to evaluate which rules match.</p>
+      <textarea class="sim-input" id="sim-input">{
+  "agent": "research-bot",
+  "tool": {
+    "name": "http_request",
+    "server": "web-fetch",
+    "category": "external_api"
+  },
+  "input": {
+    "url": "https://api.example.com/data",
+    "method": "GET"
+  }
+}</textarea>
+      <div style="margin-top:10px;">
+        <button class="btn btn-primary" id="sim-run">Evaluate</button>
+        <button class="btn btn-outline" id="sim-reset" style="margin-left:6px;">Reset</button>
+      </div>
+      <div class="sim-result" id="sim-result">Results will appear here...</div>
+    </div>
+  </div>
+
+  <!-- ── Tools ── -->
+  <div class="page" id="page-tools">
+    <div class="card">
+      <h3>Registered Tools</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Server</th><th>Risk Level</th><th>Categories</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>web_search</td><td>brave-search</td><td><span class="badge allow">LOW</span></td><td>search, external</td></tr>
+            <tr><td>web_fetch</td><td>web-fetch</td><td><span class="badge warn">MEDIUM</span></td><td>fetch, external</td></tr>
+            <tr><td>file_read</td><td>filesystem</td><td><span class="badge allow">LOW</span></td><td>read_only, file</td></tr>
+            <tr><td>file_write</td><td>filesystem</td><td><span class="badge deny">HIGH</span></td><td>write, file</td></tr>
+            <tr><td>exec_shell</td><td>sandbox</td><td><span class="badge deny">CRITICAL</span></td><td>execute, sandbox</td></tr>
+            <tr><td>db_query</td><td>postgres-mcp</td><td><span class="badge deny">HIGH</span></td><td>database, read</td></tr>
+            <tr><td>db_migrate</td><td>postgres-mcp</td><td><span class="badge deny">CRITICAL</span></td><td>database, write</td></tr>
+            <tr><td>slack_send</td><td>slack-mcp</td><td><span class="badge warn">MEDIUM</span></td><td>messaging, external</td></tr>
+            <tr><td>github_pr</td><td>github-mcp</td><td><span class="badge warn">MEDIUM</span></td><td>code, external</td></tr>
+            <tr><td>email_send</td><td>smtp-mcp</td><td><span class="badge deny">HIGH</span></td><td>messaging, external</td></tr>
+            <tr><td>code_interpreter</td><td>python-sandbox</td><td><span class="badge deny">CRITICAL</span></td><td>execute, sandbox</td></tr>
+            <tr><td>image_gen</td><td>dalle-mcp</td><td><span class="badge warn">MEDIUM</span></td><td>generation, external</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MCP ── -->
+  <div class="page" id="page-mcp">
+    <div class="card">
+      <h3>MCP Servers</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Server</th><th>Status</th><th>Tools</th><th>Last Scan</th><th>Schema Pin</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>brave-search</td><td><span class="dot green"></span>Connected</td><td>2</td><td>2026-08-11 09:15</td><td><span class="badge allow">PINNED</span></td></tr>
+            <tr><td>web-fetch</td><td><span class="dot green"></span>Connected</td><td>3</td><td>2026-08-11 09:15</td><td><span class="badge allow">PINNED</span></td></tr>
+            <tr><td>filesystem</td><td><span class="dot green"></span>Connected</td><td>5</td><td>2026-08-11 09:14</td><td><span class="badge warn">DRIFT</span></td></tr>
+            <tr><td>sandbox</td><td><span class="dot green"></span>Connected</td><td>4</td><td>2026-08-11 09:14</td><td><span class="badge allow">PINNED</span></td></tr>
+            <tr><td>postgres-mcp</td><td><span class="dot green"></span>Connected</td><td>6</td><td>2026-08-11 09:13</td><td><span class="badge allow">PINNED</span></td></tr>
+            <tr><td>slack-mcp</td><td><span class="dot yellow"></span>Degraded</td><td>3</td><td>2026-08-11 09:10</td><td><span class="badge allow">PINNED</span></td></tr>
+            <tr><td>github-mcp</td><td><span class="dot green"></span>Connected</td><td>8</td><td>2026-08-11 09:15</td><td><span class="badge deny">UNPINNED</span></td></tr>
+            <tr><td>smtp-mcp</td><td><span class="dot red"></span>Offline</td><td>2</td><td>2026-08-11 08:45</td><td><span class="badge allow">PINNED</span></td></tr>
+            <tr><td>python-sandbox</td><td><span class="dot green"></span>Connected</td><td>3</td><td>2026-08-11 09:15</td><td><span class="badge allow">PINNED</span></td></tr>
+            <tr><td>dalle-mcp</td><td><span class="dot green"></span>Connected</td><td>1</td><td>2026-08-11 09:12</td><td><span class="badge allow">PINNED</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Latest Schema Scan Report</h3>
+      <div style="font-size:13px;">
+        <p><span class="dot green"></span> <strong>9/10</strong> servers scanned successfully</p>
+        <p style="margin-top:6px;"><span class="dot yellow"></span> <strong>1</strong> schema drift detected: <code>filesystem</code> — tool <code>file_move</code> signature changed (added <code>overwrite</code> param)</p>
+        <p style="margin-top:6px;"><span class="dot red"></span> <strong>1</strong> server offline: <code>smtp-mcp</code> — last heartbeat 30m ago</p>
+        <p style="margin-top:6px;"><span class="dot yellow"></span> <strong>1</strong> unpinned schema: <code>github-mcp</code> — 2 new tools since last pin</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Approvals ── -->
+  <div class="page" id="page-approvals">
+    <div class="card">
+      <h3>Pending Approval Queue</h3>
+    </div>
+    <div id="approvals-list"></div>
+  </div>
+
+  <!-- ── Gateway ── -->
+  <div class="page" id="page-gateway">
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="label">Total Requests (24h)</div>
+        <div class="value">38,492</div>
+        <div class="sub">Avg 26.7 req/min</div>
+      </div>
+      <div class="stat-card green">
+        <div class="label">Success Rate</div>
+        <div class="value">97.8%</div>
+        <div class="sub">842 errors logged</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="label">Avg Latency</div>
+        <div class="value">142ms</div>
+        <div class="sub">P99: 890ms</div>
+      </div>
+      <div class="stat-card yellow">
+        <div class="label">Active Upstreams</div>
+        <div class="value">8/9</div>
+        <div class="sub">1 degraded</div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Upstream Health</h3>
+      <div class="vendor-grid" id="vendor-grid"></div>
+    </div>
+    <div class="card">
+      <h3>Request Volume (Hourly)</h3>
+      <div class="bar-chart" id="gateway-chart"></div>
+    </div>
+  </div>
+
+  <!-- ── Settings ── -->
+  <div class="page" id="page-settings">
+    <div class="card">
+      <h3>Current Configuration</h3>
+      <div class="json-block" id="settings-json"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ═══════════ Mock Data ═══════════ */
+const DECISIONS = [
+  { id: "D-10284", time: "14:32:07", agent: "research-bot", tool: "web_fetch", effect: "ALLOW", reason: "Read-only external fetch, policy R-006 matched" },
+  { id: "D-10283", time: "14:31:55", agent: "code-assist", tool: "exec_shell", effect: "DENY", reason: "Sandbox escape pattern detected in args: ../../etc/passwd" },
+  { id: "D-10282", time: "14:31:42", agent: "data-analyst", tool: "db_query", effect: "ALLOW", reason: "Read-only SQL, no DROP/DELETE/UPDATE keywords" },
+  { id: "D-10281", time: "14:31:30", agent: "research-bot", tool: "web_search", effect: "ALLOW", reason: "Brave search rate within limits (42/100 per min)" },
+  { id: "D-10280", time: "14:30:58", agent: "ops-agent", tool: "file_write", effect: "REQUIRE_APPROVAL", reason: "Write operation on /etc/hosts requires human approval" },
+  { id: "D-10279", time: "14:30:45", agent: "code-assist", tool: "code_interpreter", effect: "DENY", reason: "Prompt injection detected in code input: ignore previous instructions" },
+  { id: "D-10278", time: "14:30:22", agent: "data-analyst", tool: "db_migrate", effect: "DENY", reason: "Schema migration blocked by policy: production DB is read-only" },
+  { id: "D-10277", time: "14:29:58", agent: "ops-agent", tool: "slack_send", effect: "ALLOW", reason: "Message to #ops-alerts channel, approved template" },
+  { id: "D-10276", time: "14:29:40", agent: "research-bot", tool: "web_fetch", effect: "DENY", reason: "Secret leak prevented: output contained AWS_ACCESS_KEY pattern" },
+  { id: "D-10275", time: "14:29:15", agent: "code-assist", tool: "github_pr", effect: "ALLOW", reason: "PR creation within allowed repos: [frontend-app, api-server]" }
+];
+
+const AUDIT_EVENTS = [
+  { time: "14:32:07", desc: "Decision D-10284 executed", detail: "web_fetch → ALLOW by research-bot", safe: true },
+  { time: "14:31:55", desc: "Decision D-10283 executed", detail: "exec_shell → DENY (sandbox escape blocked)", safe: true },
+  { time: "14:31:42", desc: "Policy R-006 reloaded", detail: "Read-only allow rule refreshed from config", safe: true },
+  { time: "14:30:58", desc: "Approval request created", detail: "REQ-0042: file_write /etc/hosts by ops-agent", safe: true },
+  { time: "14:30:45", desc: "Decision D-10279 executed", detail: "code_interpreter → DENY (prompt injection)", safe: true },
+  { time: "14:30:22", desc: "Schema drift detected", detail: "filesystem: file_move signature changed", safe: false },
+  { time: "14:29:58", desc: "Decision D-10276 executed", detail: "web_fetch → DENY (secret leak prevented)", safe: true },
+  { time: "14:29:40", desc: "smtp-mcp health check failed", detail: "Connection timeout after 5000ms", safe: false },
+  { time: "14:29:15", desc: "Decision D-10275 executed", detail: "github_pr → ALLOW for repo frontend-app", safe: true },
+  { time: "14:28:50", desc: "Agent research-bot rate-limited", detail: "Throttled: 105 calls/min exceeds limit 100/min", safe: true }
+];
+
+const APPROVALS = [
+  { id: "REQ-0042", title: "Write to /etc/hosts", agent: "ops-agent", tool: "file_write", time: "14:30:58", priority: "high" },
+  { id: "REQ-0041", title: "Execute DB migration on production", agent: "data-analyst", tool: "db_migrate", time: "14:28:12", priority: "high" },
+  { id: "REQ-0040", title: "Send email to external domain", agent: "comms-bot", tool: "email_send", time: "14:25:33", priority: "medium" },
+  { id: "REQ-0039", title: "Create GitHub PR on private repo", agent: "code-assist", tool: "github_pr", time: "14:22:10", priority: "low" },
+  { id: "REQ-0038", title: "Execute shell command in sandbox", agent: "code-assist", tool: "exec_shell", time: "14:20:45", priority: "medium" }
+];
+
+const VENDORS = [
+  { name: "OpenAI", status: "green", latency: "89ms", label: "Healthy" },
+  { name: "Anthropic", status: "green", latency: "124ms", label: "Healthy" },
+  { name: "Google AI", status: "green", latency: "156ms", label: "Healthy" },
+  { name: "Brave Search", status: "green", latency: "42ms", label: "Healthy" },
+  { name: "GitHub API", status: "green", latency: "203ms", label: "Healthy" },
+  { name: "Slack API", status: "yellow", latency: "890ms", label: "Degraded" },
+  { name: "SMTP Relay", status: "red", latency: "—", label: "Offline" },
+  { name: "Postgres", status: "green", latency: "12ms", label: "Healthy" },
+  { name: "Redis Cache", status: "green", latency: "3ms", label: "Healthy" }
+];
+
+const SETTINGS = {
+  "version": "0.4.2",
+  "server": { "host": "0.0.0.0", "port": 8080, "workers": 4 },
+  "security": {
+    "max_tokens_per_request": 4096,
+    "rate_limit": { "enabled": true, "max_calls_per_min": 100 },
+    "sandbox": { "enabled": true, "timeout_ms": 30000, "network": false },
+    "secret_detection": { "enabled": true, "patterns": ["AWS_KEY", "GITHUB_TOKEN", "PRIVATE_KEY", "DB_PASSWORD"] },
+    "prompt_injection": { "enabled": true, "model": "injection-detector-v2" }
+  },
+  "mcp": {
+    "schema_pin": true,
+    "scan_interval_sec": 300,
+    "auto_disconnect_on_drift": false
+  },
+  "approval": {
+    "enabled": true,
+    "timeout_sec": 300,
+    "auto_deny_on_timeout": true,
+    "notify_channels": ["slack:#ops-alerts", "email:security@example.com"]
+  },
+  "audit": {
+    "chain_hash": "sha256",
+    "storage": "append_only_log",
+    "retention_days": 90
+  }
+};
+
+/* ═══════════ Rendering ═══════════ */
+function renderTimeline(container, items) {
+  container.innerHTML = items.map(item => `
+    <div class="timeline-item ${item.safe ? 'safe' : ''}">
+      <div class="time">${item.time}</div>
+      <div class="desc">${item.desc}</div>
+      <div class="detail">${item.detail} ${item.safe ? '<span class="chain-ok">&#10003;</span>' : '<span style="color:#eab308;">&#9888;</span>'}</div>
+    </div>
+  `).join('');
+}
+
+function renderDecisions(filter) {
+  const tbody = document.getElementById('decisions-tbody');
+  const filtered = filter
+    ? DECISIONS.filter(d => Object.values(d).some(v => String(v).toLowerCase().includes(filter.toLowerCase())))
+    : DECISIONS;
+  tbody.innerHTML = filtered.map(d => `
+    <tr>
+      <td>${d.id}</td>
+      <td>${d.time}</td>
+      <td>${d.agent}</td>
+      <td>${d.tool}</td>
+      <td><span class="badge ${d.effect === 'ALLOW' ? 'allow' : d.effect === 'DENY' ? 'deny' : 'warn'}">${d.effect}</span></td>
+      <td>${d.reason}</td>
+    </tr>
+  `).join('');
+}
+
+function renderBarChart(container, data) {
+  const max = Math.max(...data.map(d => d.value));
+  container.innerHTML = data.map(d => `
+    <div class="bar-col">
+      <div class="bar-value">${d.value}</div>
+      <div class="bar" style="height:${(d.value / max) * 130}px;background:${d.color || '#E60012'};"></div>
+      <div class="bar-label">${d.label}</div>
+    </div>
+  `).join('');
+}
+
+function renderApprovals() {
+  const list = document.getElementById('approvals-list');
+  list.innerHTML = APPROVALS.map(a => `
+    <div class="approval-card">
+      <div class="a-title">${a.id}: ${a.title}</div>
+      <div class="a-meta">Agent: ${a.agent} | Tool: ${a.tool} | Requested: ${a.time} | Priority: <span class="badge ${a.priority === 'high' ? 'deny' : a.priority === 'medium' ? 'warn' : 'info'}">${a.priority.toUpperCase()}</span></div>
+      <div class="a-actions">
+        <button class="btn btn-approve" onclick="handleApproval('${a.id}','approve')">Approve</button>
+        <button class="btn btn-reject" onclick="handleApproval('${a.id}','reject')">Reject</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderVendors() {
+  const grid = document.getElementById('vendor-grid');
+  grid.innerHTML = VENDORS.map(v => `
+    <div class="vendor-card">
+      <div class="vname">${v.name}</div>
+      <div class="vstatus"><span class="dot ${v.status}"></span>${v.label}</div>
+      <div class="vlatency">Latency: ${v.latency}</div>
+    </div>
+  `).join('');
+}
+
+function renderSettings() {
+  document.getElementById('settings-json').textContent = JSON.stringify(SETTINGS, null, 2);
+}
+
+/* ═══════════ Navigation ═══════════ */
+const navItems = document.querySelectorAll('.nav-item');
+const pages = document.querySelectorAll('.page');
+const pageTitle = document.getElementById('page-title');
+const titles = {
+  dashboard: 'Dashboard', decisions: 'Decisions', audit: 'Audit Trail',
+  policy: 'Policy Engine', tools: 'Tool Registry', mcp: 'MCP Servers',
+  approvals: 'Approvals', gateway: 'Gateway', settings: 'Settings'
+};
+
+navItems.forEach(item => {
+  item.addEventListener('click', () => {
+    const page = item.dataset.page;
+    navItems.forEach(n => n.classList.remove('active'));
+    item.classList.add('active');
+    pages.forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + page).classList.add('active');
+    pageTitle.textContent = titles[page] || page;
+  });
+});
+
+/* ═══════════ Sidebar Toggle ═══════════ */
+document.getElementById('toggleBtn').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.toggle('open');
+});
+
+/* ═══════════ Search ═══════════ */
+document.getElementById('decision-search').addEventListener('input', e => {
+  renderDecisions(e.target.value);
+});
+
+/* ═══════════ Policy Simulator ═══════════ */
+document.getElementById('sim-run').addEventListener('click', () => {
+  const input = document.getElementById('sim-input').value;
+  const result = document.getElementById('sim-result');
+  try {
+    const parsed = JSON.parse(input);
+    const rules = [];
+    if (parsed.input && parsed.input.url && /ignore|bypass|override|hack/i.test(JSON.stringify(parsed.input))) {
+      rules.push({ rule: 'R-001', name: 'Block Prompt Injection', effect: 'DENY' });
+    }
+    if (parsed.tool && parsed.tool.name === 'exec_shell') {
+      rules.push({ rule: 'R-002', name: 'Sandbox Escape Guard', effect: 'DENY' });
+    }
+    if (parsed.tool && parsed.tool.category === 'external_api') {
+      rules.push({ rule: 'R-008', name: 'Log All External Calls', effect: 'LOG' });
+    }
+    if (parsed.tool && parsed.tool.name === 'file_write') {
+      rules.push({ rule: 'R-005', name: 'Require Approval for File Write', effect: 'REQUIRE_APPROVAL' });
+    }
+    if (parsed.tool && parsed.tool.category === 'read_only') {
+      rules.push({ rule: 'R-006', name: 'Allow Read-Only Ops', effect: 'ALLOW' });
+    }
+    if (rules.length === 0) {
+      rules.push({ rule: 'R-006', name: 'Default Allow', effect: 'ALLOW' });
+    }
+    const finalEffect = rules.find(r => r.effect === 'DENY')
+      || rules.find(r => r.effect === 'REQUIRE_APPROVAL')
+      || rules.find(r => r.effect === 'THROTTLE')
+      || rules[0];
+    let out = 'Evaluation Result\n' + '='.repeat(40) + '\n';
+    out += 'Agent: ' + (parsed.agent || 'unknown') + '\n';
+    out += 'Tool: ' + (parsed.tool ? parsed.tool.name : 'unknown') + '\n';
+    out += 'Matched Rules: ' + rules.length + '\n\n';
+    rules.forEach(r => {
+      out += '  [' + r.effect + '] ' + r.rule + ' - ' + r.name + '\n';
+    });
+    out += '\nFinal Decision: ' + finalEffect.effect + '\n';
+    result.textContent = out;
+    result.style.borderColor = finalEffect.effect === 'DENY' ? '#E60012' : finalEffect.effect === 'ALLOW' ? '#22c55e' : '#eab308';
+  } catch (e) {
+    result.textContent = 'Error: Invalid JSON — ' + e.message;
+    result.style.borderColor = '#E60012';
+  }
+});
+
+document.getElementById('sim-reset').addEventListener('click', () => {
+  document.getElementById('sim-input').value = '';
+  document.getElementById('sim-result').textContent = 'Results will appear here...';
+  document.getElementById('sim-result').style.borderColor = '#334155';
+});
+
+/* ═══════════ Approval Actions ═══════════ */
+function handleApproval(id, action) {
+  const card = event.target.closest('.approval-card');
+  const status = action === 'approve' ? 'APPROVED' : 'REJECTED';
+  const color = action === 'approve' ? '#22c55e' : '#E60012';
+  card.querySelector('.a-actions').innerHTML = '<span style="color:' + color + ';font-weight:600;">' + status + '</span>';
+}
+
+/* ═══════════ Fetch Healthz ═══════════ */
+async function loadVersion() {
+  try {
+    const res = await fetch('/healthz');
+    const data = await res.json();
+    document.getElementById('version-label').textContent = 'v' + (data.version || '0.4.2');
+  } catch {
+    document.getElementById('version-label').textContent = 'v0.4.2';
+  }
+}
+
+/* ═══════════ Init ═══════════ */
+(function init() {
+  renderTimeline(document.getElementById('dashboard-timeline'), DECISIONS.slice(0, 6).map(d => ({
+    time: d.time, desc: d.id + ': ' + d.tool + ' → ' + d.effect, detail: d.reason, safe: d.effect !== 'DENY'
+  })));
+  renderDecisions();
+  renderTimeline(document.getElementById('audit-timeline'), AUDIT_EVENTS);
+
+  const riskData = [
+    { label: 'Mon', value: 32, color: '#E60012' },
+    { label: 'Tue', value: 28, color: '#E60012' },
+    { label: 'Wed', value: 45, color: '#E60012' },
+    { label: 'Thu', value: 18, color: '#eab308' },
+    { label: 'Fri', value: 52, color: '#E60012' },
+    { label: 'Sat', value: 12, color: '#22c55e' },
+    { label: 'Sun', value: 8, color: '#22c55e' }
+  ];
+  renderBarChart(document.getElementById('bar-chart'), riskData);
+
+  const gatewayData = [
+    { label: '00:00', value: 420, color: '#3b82f6' },
+    { label: '04:00', value: 180, color: '#3b82f6' },
+    { label: '08:00', value: 1240, color: '#3b82f6' },
+    { label: '10:00', value: 2800, color: '#E60012' },
+    { label: '12:00', value: 2100, color: '#3b82f6' },
+    { label: '14:00', value: 2650, color: '#3b82f6' },
+    { label: '16:00', value: 1900, color: '#3b82f6' },
+    { label: '18:00', value: 1100, color: '#3b82f6' },
+    { label: '20:00', value: 680, color: '#3b82f6' },
+    { label: '22:00', value: 520, color: '#3b82f6' }
+  ];
+  renderBarChart(document.getElementById('gateway-chart'), gatewayData);
+
+  renderApprovals();
+  renderVendors();
+  renderSettings();
+  loadVersion();
+})();
+</script>
+</body>
+</html>

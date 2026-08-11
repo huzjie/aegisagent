@@ -1,0 +1,112 @@
+id: mcp-hardening
+name: MCP Server Hardening
+version: "2026.08.11"
+description: Controls for Model Context Protocol servers and tool poisoning defence.
+defaults:
+  effect: require_approval
+rules:
+  - id: mcp-unpinned-schema-deny
+    description: Tool calls whose server schema drifted from the pinned hash are denied.
+    priority: 950
+    effect: deny
+    references: [OWASP-LLM05]
+    when:
+      all:
+        - { field: extra.schema_drift, op: eq, value: true }
+  - id: mcp-tool-poisoning-finding-deny
+    description: A tool-poisoning detector finding on the server blocks its tools.
+    priority: 960
+    effect: deny
+    references: [OWASP-LLM05, OWASP-LLM01]
+    when:
+      all:
+        - { field: findings.kinds, op: contains, value: tool_poisoning }
+        - { field: findings.max_severity, op: gte, value: high }
+  - id: mcp-shadow-tool-deny
+    description: Tools not declared at connect time (shadow tools) are denied.
+    priority: 940
+    effect: deny
+    references: [OWASP-LLM05]
+    when:
+      all:
+        - { field: extra.shadow_tool, op: eq, value: true }
+  - id: mcp-untrusted-server-sandbox
+    description: Tools served by an untrusted MCP server run in a sandbox.
+    priority: 900
+    effect: sandbox
+    references: [OWASP-LLM05]
+    when:
+      all:
+        - { field: extra.server_trusted, op: eq, value: false }
+  - id: mcp-approval-required-default
+    description: Tools the server marked as requiring approval are held for a human.
+    priority: 860
+    effect: require_approval
+    references: [OWASP-LLM05]
+    when:
+      all:
+        - { field: extra.server_requires_approval, op: eq, value: true }
+  - id: mcp-argument-injection-redact
+    description: Arguments containing server-controlled templated instructions are redacted.
+    priority: 870
+    effect: redact
+    references: [OWASP-LLM05, OWASP-LLM01]
+    when:
+      all:
+        - { field: arguments.content, op: regex, value: "(?i)(<server-instruction>|<!-- mcp-injected -->)" }
+    obligations:
+      redact: [arguments.content]
+  - id: mcp-high-privilege-deny
+    description: Servers requesting filesystem or shell access are denied unless pinned.
+    priority: 920
+    effect: deny
+    references: [OWASP-LLM05]
+    when:
+      all:
+        - { field: extra.server_scope, op: contains, value: fs_root }
+        - { field: extra.server_pinned, op: eq, value: false }
+  - id: mcp-rate-limit-shared
+    description: Shared/multi-tenant MCP servers are throttled per session.
+    priority: 800
+    effect: throttle
+    references: [OWASP-LLM05]
+    when:
+      all:
+        - { field: extra.server_multi_tenant, op: eq, value: true }
+    obligations:
+      throttle: { per_minute: 20, burst: 5 }
+  - id: mcp-version-mismatch-deny
+    description: Calls to a server whose protocol version differs from the pinned one are denied.
+    priority: 880
+    effect: deny
+    references: [OWASP-LLM05]
+    when:
+      all:
+        - { field: extra.protocol_version_mismatch, op: eq, value: true }
+  - id: mcp-community-server-sandbox
+    description: Community and marketplace MCP servers are never trusted with the host directly.
+    priority: 910
+    effect: sandbox
+    references: [OWASP-LLM05]
+    match:
+      servers: ["community-*", "marketplace-*", "unverified-*"]
+    obligations:
+      sandbox: { profile: strict, network: proxy, filesystem: readonly }
+  - id: mcp-local-privileged-tool-approval
+    description: Local servers exposing shell or filesystem roots require approval per call.
+    priority: 905
+    effect: require_approval
+    references: [OWASP-LLM05]
+    match:
+      servers: ["local", "stdio-*"]
+      tools: ["shell::*", "fs::*", "process::*"]
+    obligations:
+      approval_roles: [security, ops]
+  - id: mcp-audited-server-allow
+    description: Tools from a fully audited, pinned server are allowed with observation.
+    priority: 200
+    effect: observe
+    when:
+      all:
+        - { field: extra.server_audited, op: eq, value: true }
+        - { field: extra.server_pinned, op: eq, value: true }

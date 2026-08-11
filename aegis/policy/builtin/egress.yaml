@@ -1,0 +1,124 @@
+id: egress
+name: Network Egress Control
+version: "2026.08.11"
+description: Constrain outbound network connections from tool calls.
+defaults:
+  effect: require_approval
+rules:
+  - id: egress-to-allowlist-allow
+    description: Outbound calls to the approved allowlist are allowed.
+    priority: 300
+    effect: allow
+    when:
+      all:
+        - { field: call.category_value, op: eq, value: network }
+        - { field: arguments.host, op: cidr, value: [10.0.0.0/8, 192.168.0.0/16] }
+  - id: egress-to-unknown-deny
+    description: Egress to hosts outside any known allowlist is denied.
+    priority: 950
+    effect: deny
+    references: [OWASP-LLM02]
+    match:
+      categories: [network]
+    when:
+      all:
+        - { field: extra.host_allowlisted, op: eq, value: false }
+  - id: egress-exfil-to-personal-deny
+    description: Egress to personal file-sharing or paste endpoints is denied.
+    priority: 960
+    effect: deny
+    references: [OWASP-LLM02]
+    when:
+      all:
+        - { field: arguments.host, op: glob, value: ["*.pastebin.com", "*.dropbox.com", "drive.google.com"] }
+  - id: egress-bulk-data-approval
+    description: Large outbound data transfers require approval.
+    priority: 900
+    effect: require_approval
+    references: [OWASP-LLM02]
+    when:
+      all:
+        - { field: arguments.bytes, op: gt, value: 10485760 }
+    obligations:
+      approval_roles: [security]
+  - id: egress-tor-or-vpn-deny
+    description: Connections to anonymising infrastructure are denied.
+    priority: 930
+    effect: deny
+    references: [OWASP-LLM02]
+    when:
+      all:
+        - { field: arguments.host, op: glob, value: ["*.onion", "*.tor2web*"] }
+  - id: egress-night-window-approval
+    description: Egress during the maintenance window requires approval.
+    priority: 840
+    effect: require_approval
+    references: [OWASP-LLM02]
+    match:
+      categories: [network]
+    when:
+      all:
+        - { field: extra.night_window, op: eq, value: true }
+  - id: egress-sandbox-untrusted
+    description: Egress from untrusted agents runs inside a sandbox egress proxy.
+    priority: 880
+    effect: sandbox
+    references: [OWASP-LLM02]
+    match:
+      categories: [network]
+    when:
+      all:
+        - { field: agent.trust_tier, op: eq, value: untrusted }
+  - id: egress-throttle-external-api
+    description: Calls to external third-party APIs are rate limited.
+    priority: 800
+    effect: throttle
+    references: [OWASP-LLM02]
+    when:
+      all:
+        - { field: extra.external_api, op: eq, value: true }
+    obligations:
+      throttle: { per_minute: 30, burst: 10 }
+  - id: egress-credential-in-url-deny
+    description: URLs embedding credentials are denied to prevent leakage.
+    priority: 920
+    effect: deny
+    references: [OWASP-LLM07, OWASP-LLM02]
+    when:
+      all:
+        - { field: arguments.url, op: regex, value: "(?i)[a-z]+://[^@/]+:[^@/]+@" }
+  - id: egress-internal-only-allow
+    description: Calls confined to the internal network are allowed with observation.
+    priority: 250
+    effect: observe
+    when:
+      all:
+        - { field: arguments.host, op: cidr, value: [172.16.0.0/12] }
+  - id: egress-outbound-tool-guard
+    description: Outbound-capable tools are pinned by name, so egress control does not depend on category tagging.
+    priority: 910
+    effect: require_approval
+    references: [OWASP-LLM02]
+    match:
+      tools:
+        - "http::post"
+        - "http::put"
+        - "http::request"
+        - "net::curl"
+        - "net::socket"
+        - "browser::navigate"
+        - "email::send"
+        - "slack::post_message"
+        - "webhook::dispatch"
+    when:
+      all:
+        - { field: extra.host_allowlisted, op: ne, value: true }
+    obligations:
+      approval_roles: [security]
+  - id: egress-default-deny
+    description: Any egress not explicitly allowed defaults to denial.
+    priority: 120
+    effect: deny
+    references: [OWASP-LLM02]
+    match:
+      categories: [network]

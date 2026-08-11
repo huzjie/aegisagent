@@ -1,0 +1,124 @@
+id: supply-chain
+version: "2026.08.1"
+description: "Dependency poisoning, remote-code installs, registry redirection and build-system tampering."
+signatures:
+  - id: sup-001
+    pattern: '(?i)\b(?:curl|wget)\b[^\n|;]{0,200}\|\s*(?:sudo\s+)?(?:ba|z|k|)sh\b'
+    severity: critical
+    confidence: 0.92
+    description: Remote script piped straight into a shell (curl | sh).
+    tags: [rce, install, unix]
+  - id: sup-002
+    pattern: '(?i)\b(?:iwr|Invoke-WebRequest|Invoke-Expression|iex)\b[^\n]{0,120}\|\s*iex\b'
+    severity: critical
+    confidence: 0.92
+    description: PowerShell download-and-execute one-liner.
+    tags: [rce, install, windows]
+  - id: sup-003
+    pattern: '(?i)\bpip3?\s+install\b[^\n]{0,120}\s--(?:extra-)?index-url\s+\S+'
+    severity: high
+    confidence: 0.8
+    description: pip install redirected to a non-default index (dependency confusion).
+    tags: [pypi, registry, dependency_confusion]
+  - id: sup-004
+    pattern: '(?i)\bnpm\s+(?:install|i)\b[^\n]{0,120}\s--registry[= ]\S+'
+    severity: high
+    confidence: 0.8
+    description: npm install redirected to a non-default registry.
+    tags: [npm, registry, dependency_confusion]
+  - id: sup-005
+    pattern: '(?i)\b(?:pip3?|npm|yarn|pnpm)\s+(?:install|i|add)\b[^\n]{0,160}https?://(?:[a-z0-9-]+\.)*(?:ngrok|pastebin|raw\.githubusercontent|gist\.github)'
+    severity: critical
+    confidence: 0.9
+    description: Package installed directly from an ad-hoc URL rather than a registry.
+    tags: [install, url_install]
+  - id: sup-006
+    pattern: '(?i)\bpip3?\s+install\b[^\n]{0,80}\s(?:-e\s+)?git\+(?:https?|ssh|git)://'
+    severity: high
+    confidence: 0.75
+    description: pip install from a raw VCS URL - bypasses index review.
+    tags: [pypi, vcs_install]
+  - id: sup-007
+    pattern: '(?i)\bnpm\s+(?:install|i)\b[^\n]{0,80}\s(?:git\+)?(?:https?|ssh)://[^\s]+\.git'
+    severity: high
+    confidence: 0.75
+    description: npm install from a raw git URL.
+    tags: [npm, vcs_install]
+  - id: sup-008
+    pattern: '(?i)\b(?:reqeusts|requsts|urlib3|python3-dateutil|colourama|crossenv|loadash|lodahs|expres|axioss|torchtriton|discord\.dll|ua-parser-js-v2)\b'
+    severity: critical
+    confidence: 0.93
+    description: Package name published on the malicious-typosquat list.
+    tags: [typosquat, malicious_package]
+  - id: sup-009
+    pattern: '(?i)\bnpm\s+(?:install|i)\b[^\n]{0,120}\s--ignore-scripts=false'
+    severity: high
+    confidence: 0.7
+    description: Explicitly re-enables lifecycle scripts, the npm RCE surface.
+    tags: [npm, lifecycle_script]
+  - id: sup-010
+    pattern: '(?i)"(?:preinstall|postinstall|prepare)"\s*:\s*"[^"]{0,200}(?:curl|wget|node\s+-e|python\s+-c|bash\s+-c|eval)'
+    severity: critical
+    confidence: 0.92
+    description: package.json lifecycle hook executing arbitrary code at install time.
+    tags: [npm, lifecycle_script, rce]
+  - id: sup-011
+    pattern: '(?i)\bsetup\s*\(\s*[^)]{0,400}cmdclass\s*=\s*\{[^}]{0,200}install'
+    severity: high
+    confidence: 0.75
+    description: setup.py overriding the install command - install-time code execution.
+    tags: [pypi, lifecycle_script, rce]
+  - id: sup-012
+    pattern: '(?i)\b(?:pip3?|npm|yarn|gem|cargo)\b[^\n]{0,80}\s--(?:trusted-host|no-verify|insecure|allow-unauthenticated)\b'
+    severity: high
+    confidence: 0.85
+    description: Install with certificate or signature verification disabled.
+    tags: [install, verification_disabled]
+  - id: sup-013
+    pattern: '(?i)\b(?:docker|podman)\s+(?:run|pull)\b[^\n]{0,120}\s(?!(?:ghcr\.io|docker\.io|quay\.io|mcr\.microsoft\.com|registry-1\.docker\.io))[a-z0-9.-]+\.[a-z]{2,}/[a-z0-9/_.-]+'
+    severity: medium
+    confidence: 0.6
+    description: Container image pulled from an unrecognised registry.
+    tags: [container, registry]
+  - id: sup-014
+    pattern: '(?i)\bdocker\s+run\b[^\n]{0,160}\s(?:--privileged|-v\s+/var/run/docker\.sock)'
+    severity: critical
+    confidence: 0.92
+    description: Privileged container or docker socket mount - trivial host escape.
+    tags: [container, escape]
+  - id: sup-015
+    pattern: '(?i)\b(?:pip3?|npm|yarn|pnpm)\s+(?:install|i|add)\b[^\n]{0,60}\s--pre\b'
+    severity: medium
+    confidence: 0.5
+    description: Pre-release install pulls unreviewed versions.
+    tags: [install, unpinned]
+  - id: sup-016
+    pattern: '(?i)\b(?:npm|yarn|pnpm)\s+(?:install|add)\s+[a-z0-9@/_.-]+@latest\b'
+    severity: medium
+    confidence: 0.5
+    description: Floating @latest dependency - a poisoned release is adopted automatically.
+    tags: [install, unpinned]
+  - id: sup-017
+    pattern: '(?i)\b(?:rm|del)\b[^\n]{0,40}(?:package-lock\.json|yarn\.lock|poetry\.lock|Cargo\.lock|requirements\.txt)'
+    severity: high
+    confidence: 0.8
+    description: Deleting a lockfile removes pinning and integrity hashes.
+    tags: [lockfile, tampering]
+  - id: sup-018
+    pattern: '(?i)\b(?:npm|pip)\s+config\s+set\b[^\n]{0,80}(?:registry|index-url|strict-ssl)'
+    severity: high
+    confidence: 0.8
+    description: Persistently rewires the package manager to a different index.
+    tags: [registry, tampering, persistence]
+  - id: sup-019
+    pattern: '(?i)\becho\b[^\n]{0,120}>>\s*(?:~/\.npmrc|~/\.pypirc|/etc/pip\.conf)'
+    severity: critical
+    confidence: 0.85
+    description: Writes registry credentials or overrides into package-manager config.
+    tags: [registry, tampering, persistence]
+  - id: sup-020
+    pattern: '(?i)\bgit\s+(?:clone|remote\s+add|submodule\s+add)\b[^\n]{0,120}(?:pastebin|ngrok|\d{1,3}(?:\.\d{1,3}){3})'
+    severity: high
+    confidence: 0.75
+    description: Source pulled from an untrusted or IP-literal origin.
+    tags: [vcs, untrusted_source]

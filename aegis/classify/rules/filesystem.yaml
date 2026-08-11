@@ -1,0 +1,22 @@
+# Filesystem argument risk rules for AegisAgent.
+# Watches `arguments.path` / `arguments.destination` for sensitive locations and
+# irreversible operations.
+id: filesystem
+version: "2026.08.11"
+rules:
+  - { id: fs-001, field: arguments.path, op: matches, value: "/etc/(passwd|shadow|sudoers)", category: secret, risk: critical, description: "访问系统凭证文件", remediation: "仅允许受管配置管理读取" }
+  - { id: fs-002, field: arguments.path, op: matches, value: "/root/|/home/[^/]+/\\.ssh", category: secret, risk: critical, description: "访问 root 或 SSH 目录", remediation: "禁止读取私钥与 known_hosts" }
+  - { id: fs-003, field: arguments.path, op: matches, value: "/home/[^/]+/\\.aws|/root/\\.aws|\\.config/aws", category: secret, risk: critical, description: "访问云凭证目录", remediation: "云凭证禁止暴露给工具" }
+  - { id: fs-004, field: arguments.path, op: matches, value: "C:\\\\Windows|C:\\\\Users\\\\[^\\\\]+\\\\.ssh|AppData", category: secret, risk: critical, description: "Windows 系统/凭证路径", remediation: "禁止访问 Windows 敏感路径" }
+  - { id: fs-005, field: arguments.path, op: matches, value: "/var/lib/docker|/var/lib/kubelet|/etc/kubernetes", category: secret, risk: high, description: "容器/编排运行时目录", remediation: "运行时配置需审批" }
+  - { id: fs-006, field: arguments.path, op: matches, value: "\\.env|\\.git/|credentials", category: secret, risk: high, description: "环境/凭证文件", remediation: "避免将 .env/.git 暴露给工具" }
+  - { id: fs-007, field: arguments.path, op: matches, value: "/proc/|/sys/|/dev/", category: execute, risk: high, description: "访问内核伪文件系统", remediation: "禁止访问 /proc /sys /dev" }
+  - { id: fs-008, field: arguments.operation, op: matches, value: "delete|remove|unlink|purge", category: destructive, risk: high, description: "删除文件操作", remediation: "软删除并保留回收" }
+  - { id: fs-009, field: arguments.operation, op: matches, value: "chmod|chown", category: config, risk: medium, description: "变更文件权限/属主", remediation: "按最小权限设置" }
+  - { id: fs-010, field: arguments.recursive, op: eq, value: true, category: destructive, risk: medium, description: "递归操作目录", remediation: "确认递归范围，避免大范围影响" }
+  - { id: fs-011, field: arguments.force, op: eq, value: true, category: destructive, risk: medium, description: "强制覆盖写", remediation: "强制写可能覆盖重要文件" }
+  - { id: fs-012, field: arguments.destination, op: matches, value: "s3://|gs://|az://|/mnt/|/backup", category: data_export, risk: medium, description: "写入外部/备份存储", remediation: "确认目标桶策略与加密" }
+  - { id: fs-013, field: arguments.path, op: matches, value: "/var/log|/var/audit", category: config, risk: medium, description: "审计/日志目录", remediation: "日志篡改需告警" }
+  - { id: fs-014, field: arguments.path, op: matches, value: "world-writable|/tmp/\\.\\./|symlink", category: execute, risk: high, description: "可疑符号链接/可写路径", remediation: "避免路径穿越与 symlink 攻击" }
+  - { id: fs-015, field: arguments.path, op: matches, value: "/etc/cron|/etc/systemd", category: config, risk: high, description: "系统服务/定时任务配置", remediation: "持久化机制变更需审批" }
+  - { id: fs-016, field: arguments.path, op: matches, value: "node_modules/\\.bin|/usr/local/bin", category: deploy, risk: medium, description: "写入可执行路径", remediation: "写入 PATH 可执行目录需确认来源" }

@@ -1,0 +1,140 @@
+id: prompt-injection
+name: Prompt Injection Defense
+version: "2026.08.11"
+description: Mitigations for indirect and direct prompt injection targeting tool calls.
+defaults:
+  effect: require_approval
+rules:
+  - id: pi-injection-finding-block
+    description: A confirmed prompt-injection detector finding blocks the call.
+    priority: 920
+    effect: deny
+    references: [OWASP-LLM01]
+    when:
+      all:
+        - { field: findings.kinds, op: contains, value: prompt_injection }
+        - { field: findings.max_severity, op: gte, value: high }
+  - id: pi-system-prompt-exfil
+    description: Tool arguments that attempt to exfiltrate the system prompt are denied.
+    priority: 900
+    effect: deny
+    references: [OWASP-LLM01]
+    when:
+      all:
+        - { field: arguments.content, op: regex, value: "(?i)(ignore previous|disregard|system prompt|you are now)" }
+  - id: pi-tool-poisoning-sandbox
+    description: Calls from a tool flagged for poisoning run in a sandbox.
+    priority: 860
+    effect: sandbox
+    references: [OWASP-LLM01]
+    when:
+      all:
+        - { field: findings.kinds, op: contains, value: tool_poisoning }
+  - id: pi-unicode-smuggle-redact
+    description: Invisible/unicode-smuggled arguments are redacted before execution.
+    priority: 840
+    effect: redact
+    references: [OWASP-LLM01]
+    when:
+      all:
+        - { field: extra.invisible_chars, op: gt, value: 0 }
+    obligations:
+      redact: [arguments.content, arguments.message, arguments.text]
+  - id: pi-agent-impersonation-deny
+    description: Instructions telling the agent to impersonate another identity are denied.
+    priority: 880
+    effect: deny
+    references: [OWASP-LLM01]
+    when:
+      all:
+        - { field: arguments.content, op: regex, value: "(?i)(pretend to be|act as (an?|the) (admin|root|other))" }
+  - id: pi-data-exfil-approval
+    description: Tool calls that read data and then request network egress are held for approval.
+    priority: 820
+    effect: require_approval
+    references: [OWASP-LLM01]
+    match:
+      categories: [read, network]
+  - id: pi-credential-request-deny
+    description: Tool calls asking for credentials or secrets by name are denied.
+    priority: 870
+    effect: deny
+    references: [OWASP-LLM01, OWASP-LLM07]
+    when:
+      all:
+        - { field: arguments.content, op: regex, value: "(?i)(give me (the )?(api[_-]?key|password|token|secret))" }
+  - id: pi-encoded-payload-sandbox
+    description: Heavily base64/hex-encoded payloads in arguments are sandboxed pending review.
+    priority: 800
+    effect: sandbox
+    references: [OWASP-LLM01]
+    when:
+      all:
+        - { field: arguments.payload, op: regex, value: "(?i)^(?:[A-Za-z0-9+/]{32,}={0,2}|[0-9a-f]{64,})$" }
+  - id: pi-role-escalation-deny
+    description: Attempts to escalate the agent's own permission profile are denied.
+    priority: 890
+    effect: deny
+    references: [OWASP-LLM01]
+    when:
+      all:
+        - { field: arguments.action, op: eq, value: escalate_privileges }
+  - id: pi-external-instruction-egress
+    description: Tool calls that echo externally-supplied text into an egress channel require approval.
+    priority: 780
+    effect: require_approval
+    match:
+      categories: [network, communication]
+    when:
+      all:
+        - { field: extra.from_untrusted_source, op: eq, value: true }
+  - id: pi-anomaly-throttle
+    description: Anomalous tool-call sequences are throttled to limit blast radius.
+    priority: 760
+    effect: throttle
+    references: [OWASP-LLM01]
+    when:
+      all:
+        - { field: findings.kinds, op: contains, value: anomaly }
+    obligations:
+      throttle: { per_minute: 10, burst: 3 }
+  - id: pi-untrusted-content-sink-guard
+    description: Tools that ingest third-party content are the indirect-injection entry point and are sanitised first.
+    priority: 830
+    effect: redact
+    references: [OWASP-LLM01]
+    match:
+      tools:
+        - "browser::fetch"
+        - "browser::navigate"
+        - "web::search"
+        - "http::get"
+        - "rss::read"
+        - "email::read"
+        - "github::read_issue"
+        - "jira::read_ticket"
+    obligations:
+      redact: [arguments.content, arguments.body, arguments.html]
+      redact_result: [content, body, html]
+      annotate: { reason: untrusted-content-source, sanitize_result: true }
+  - id: pi-injected-content-to-actuator-deny
+    description: Untrusted fetched content must never flow straight into a state-changing actuator.
+    priority: 935
+    effect: deny
+    references: [OWASP-LLM01, OWASP-LLM02]
+    match:
+      tools: ["shell::*", "fs::write", "db::execute", "payments::*", "k8s::apply"]
+    when:
+      all:
+        - { field: extra.from_untrusted_source, op: eq, value: true }
+    obligations:
+      incident: true
+      severity: critical
+  - id: pi-benign-injection-allow
+    description: Low-confidence injection findings with no sensitive category are allowed but observed.
+    priority: 120
+    effect: observe
+    when:
+      all:
+        - { field: findings.kinds, op: contains, value: prompt_injection }
+        - { field: findings.max_severity, op: lt, value: high }

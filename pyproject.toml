@@ -1,0 +1,101 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aegisagent"
+version = "1.0.0"
+description = "Runtime security gateway and privilege governance platform for AI agents - tool-call provenance, policy enforcement, sandbox isolation, HITL approval, red-team harness and tamper-evident audit."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "AegisAgent Contributors" }]
+keywords = [
+  "ai-security", "agent-security", "llm-security", "prompt-injection",
+  "mcp", "guardrails", "sandbox", "zero-trust", "ai-governance", "tool-calling",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: System Administrators",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Security",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+# The core runtime is intentionally dependency-free (standard library only).
+dependencies = []
+
+[project.optional-dependencies]
+server = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.27",
+  "pydantic>=2.5",
+  "python-multipart>=0.0.9",
+  "PyYAML>=6.0",
+]
+storage = ["SQLAlchemy>=2.0", "psycopg[binary]>=3.1", "alembic>=1.13"]
+crypto = ["cryptography>=42.0"]
+providers = ["httpx>=0.26", "openai>=1.30", "anthropic>=0.25"]
+observability = [
+  "prometheus-client>=0.20",
+  "opentelemetry-sdk>=1.24",
+  "opentelemetry-exporter-otlp>=1.24",
+]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.4", "mypy>=1.9", "black>=24.3"]
+all = [
+  "aegisagent[server]", "aegisagent[storage]", "aegisagent[crypto]",
+  "aegisagent[providers]", "aegisagent[observability]",
+]
+
+[project.urls]
+Homepage = "https://github.com/huzjie/aegisagent"
+Documentation = "https://github.com/huzjie/aegisagent/tree/main/docs"
+Repository = "https://github.com/huzjie/aegisagent"
+Issues = "https://github.com/huzjie/aegisagent/issues"
+Changelog = "https://github.com/huzjie/aegisagent/blob/main/CHANGELOG.md"
+
+[project.scripts]
+aegis = "aegis.cli.main:main"
+
+[tool.setuptools.packages.find]
+include = ["aegis*"]
+exclude = ["tests*", "web*", "docs*", "deploy*"]
+
+[tool.setuptools.package-data]
+aegis = [
+  "policy/builtin/*.yaml",
+  "detect/signatures/*.yaml",
+  "classify/rules/*.yaml",
+  "redteam/scenarios/*.yaml",
+  "redteam/suites/*.yaml",
+  "compliance/mappings/*.yaml",
+  "frontend/static/*.html",
+  "frontend/static/*.css",
+  "frontend/static/*.js",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "S", "C4", "SIM"]
+ignore = ["S101", "S603", "S607", "E501", "B008"]
+
+[tool.black]
+line-length = 110
+target-version = ["py310"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = false
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --tb=short"
